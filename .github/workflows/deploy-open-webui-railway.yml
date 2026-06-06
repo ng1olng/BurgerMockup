@@ -1,0 +1,34 @@
+# Deploys the vendored open-webui service to Railway via CLI.
+# GitHub App integration is unavailable for this repo (personal-account owner,
+# deployer is a collaborator) — deploys use a Railway project token instead.
+# RAILWAY_TOKEN: project token (production env), repo Actions secret.
+name: Deploy open-webui to Railway
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/open-webui/**']
+
+# A newer push cancels an in-flight deploy of the same service.
+concurrency:
+  group: railway-open-webui
+  cancel-in-progress: true
+
+# Deploy uses RAILWAY_TOKEN only; the default GITHUB_TOKEN is not needed.
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Build streams through `railway up --ci`; cap runner time well above the
+    # ~20min image build + 600s first-boot healthcheck window.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm i -g @railway/cli
+      # working-directory = build context: railway.toml + Dockerfile live at
+      # this root, so Railway picks the Dockerfile builder (not Railpack).
+      - run: railway up --service open-webui --ci
+        working-directory: src/open-webui
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
