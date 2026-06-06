@@ -16,6 +16,7 @@ from fastmcp import Client
 from PIL import Image
 
 from server import jobs
+from server.pipeline import scene_gen
 from server.storage import file_store
 from server.main import mcp
 
@@ -25,9 +26,12 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture(autouse=True)
 def _tmp_files_dir(tmp_path, monkeypatch):
     file_store.init(str(tmp_path))
-    # Hermetic: a developer's ambient GEMINI_API_KEY must not flip these tests
-    # onto the live lifestyle path — conformance asserts the flat behavior.
+    # Hermetic: conformance asserts the flat behavior, so the lifestyle path
+    # must be unavailable. delenv alone is not enough — scene_gen._api_key()
+    # reloads .env with override=True on every call, resurrecting the key —
+    # so available() itself is pinned to False.
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(scene_gen, "available", lambda: False)
     yield
 
 
