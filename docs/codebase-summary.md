@@ -16,6 +16,36 @@
 
 ---
 
+## BurgerMockup MCP Server (`burgermockup-mcp-server/`)
+
+**Scale**: Python 3.12 FastMCP server with 5 stateless tools for design→mockup CV pipeline.
+
+**Key Constraints**:
+- Versions pinned: `fastmcp==3.4.1`, `mcp==1.27.2` (never bump; fastmcp #1305 breaks abort semantics)
+- SSIM gate enforced server-side: ≥0.92 flat, ≥0.85 lifestyle (internal margin ≥0.93/0.87)
+- Design pixels never pass through image model (warped + masked in design space, scored with CV)
+- No auth required (local 127.0.0.1 only; job_id minting + variant caps provide credit guardrails)
+
+**5 MCP Tools** (`server/tools/`):
+1. **match_product** — Query BurgerPrints catalog by design description; return product + print-quad metadata
+2. **generate_mockups** — Full pipeline: scene generation (Gemini), compositing, SSIM verification, retry on fail
+3. **refine_mockups** — Design-only refine (scale, rotate) within a session; zero image-model calls; reuse cached scene
+4. **register_design** — Persist design metadata (hash, print-area) for catalog indexing
+5. **export_listing** — Stub for marketplace publish (TBD)
+
+**Pipeline** (`server/cv/`):
+- Scene caching per design (byte-deterministic; reused across refines)
+- ECC-based quad detection + homography warping
+- Design masking + SSIM scoring (gaussian window, design-on-unwarped-base reference)
+- Per-variant error isolation + fast-fail
+
+**OpenWebUI Integration**:
+- Native MCP via streamable HTTP: `http://host.docker.internal:8100/mcp` from Docker
+- Tool IDs: `server:mcp:burgermockup`
+- No progress UI surfacing (MCP notifications ignored by OpenWebUI v0.9.6; final result only)
+
+---
+
 ## Directory Map
 
 ### Backend (`src/open-webui/backend/open_webui/`)

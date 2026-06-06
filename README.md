@@ -6,6 +6,17 @@ This repo serves as a **base for mockups and customizations** — the full Open 
 
 ## Quick Start
 
+### BurgerMockup MCP Server
+Start the MCP server to enable design→mockup generation tools (CV composition, SSIM gate):
+```bash
+cd burgermockup-mcp-server
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python -m server.main
+```
+Server binds to `http://127.0.0.1:8101/mcp`. OpenWebUI connects natively via `http://host.docker.internal:8101/mcp` from Docker containers. Port 8101 avoids colliding with the hack-burger dev copy on 8100 (set in `.env`).
+
 ### Docker Compose (Recommended)
 ```bash
 cd src/open-webui
@@ -31,6 +42,11 @@ docker compose -f docker-compose-launcher.sh up -d
 
 ```
 BurgerMockup/
+├── burgermockup-mcp-server/ # FastMCP server with 5 MCP tools for design→mockup CV pipeline
+│   ├── server/              # Python 3.12 MCP tools + SSIM gate + composition
+│   ├── requirements.txt      # fastmcp==3.4.1, mcp==1.27.2 (pinned)
+│   ├── .env.example         # Env template (no auth required)
+│   └── README.md            # MCP server documentation
 ├── src/open-webui/          # Vendored Open WebUI v0.9.6 (~310K LOC)
 │   ├── backend/             # FastAPI server + SQLAlchemy + Alembic
 │   ├── src/                 # SvelteKit frontend (Svelte 5, TypeScript)
