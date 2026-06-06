@@ -170,6 +170,10 @@ async def generate_mockups(
     placement: str = "center",
 ) -> dict:
     """Generate mockup variants of a registered design on a catalog product.
+    If the user wants a person wearing the product, a model, or any
+    scene/location ("a man wearing it", "on the street", "in a café"), you
+    MUST pass scene_specs=[{"setting": "<that description>"}] — empty
+    scene_specs renders a flat product-only image.
     `n` defaults to 1 — pass n>1 ONLY when the user explicitly asks for a
     number of images ("give me 5 mockups" -> n=5). Batches without a scene
     automatically vary placement/scale per variant so the images differ.
@@ -221,7 +225,11 @@ async def refine_mockups(
     variants: list[dict], delta: dict, ctx: Context,
     placement: str = "center",
 ) -> dict:
-    """Refine existing variants — a refine returns ONE image by default. If
+    """Refine existing variants. Call this — NOT generate_mockups and NOT a
+    text-only reply — whenever the user asks to change an existing mockup.
+    Example: "make the design smaller" -> refine_mockups(variants=<variants
+    from the last result>, delta={"type": "design", "scale": 0.7}).
+    A refine returns ONE image by default. If
     the user doesn't say which image, pass target_ordinal of the most recent
     variant; omit target_ordinal ONLY when the user explicitly asks to update
     ALL images. delta.type: design (reuse scenes, no image-model call) | scene
