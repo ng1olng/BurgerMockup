@@ -645,6 +645,71 @@ Both can also be configured later in **Admin Panel → Settings → Connections*
 
 ---
 
+## Hosting the MCP server on Railway
+
+Deploy `src/burgermockup-mcp-server` as a **second service in the same Railway project** as
+Open WebUI. The server has no built-in auth, so the public deployment is protected by a shared
+Bearer token (`MCP_AUTH_TOKEN`); Open WebUI sends it natively as the MCP connection's API key.
+
+Config-as-code: `src/burgermockup-mcp-server/railway.toml` (builder `DOCKERFILE`, healthcheck
+`/health`, `ON_FAILURE` restart). Dashboard prerequisite: **Root Directory** =
+`src/burgermockup-mcp-server` (or deploy via `railway up ./src/burgermockup-mcp-server`, which
+uploads that dir as the build context directly).
+
+### Security model
+
+- The Bearer gate (`server/auth_middleware.py`) enforces `Authorization: Bearer $MCP_AUTH_TOKEN`
+  on `/mcp` + the mutation routes (`/designs`, `/jobs/...`).
+- **Exempt by design:** `/health` (Railway probe sends no header) and `/files/{id}` (rendered in
+  the user's browser via `<img>`, which can't carry an auth header — file ids are UUID-keyed, so
+  unguessable but **not** authenticated; acceptable for a controlled demo, not for sensitive media).
+- The gate **self-disables** when `MCP_AUTH_TOKEN` is unset/blank — local loopback and
+  `docker-compose.mcp.yaml` (which pass no token) keep working unchanged.
+- Token compare is constant-time (`hmac.compare_digest` on raw bytes).
+
+### Step 1 — Create the service
+
+```bash
+railway up ./src/burgermockup-mcp-server      # in the linked project; deploys to the linked service
+```
+First boot may fail its healthcheck until env (Step 2) is set — that's expected; redeploy fixes it.
+
+### Step 2 — Volume, domain, env
+
+1. **Attach Volume** → mount path `/data` (covers `/data/files` + `/data/metrics`). **Single replica** (local file store).
+2. **Settings → Networking → Generate Domain** → note `https://<mcp>.up.railway.app`.
+3. **Variables:**
+
+   | Variable | Value | Notes |
+   |----------|-------|-------|
+   | `MCP_AUTH_TOKEN` | `openssl rand -hex 32` | **Save it** — Open WebUI needs the same value. |
+   | `PUBLIC_FILES_BASE` | `https://<mcp>.up.railway.app` | Base for returned file links. **Chicken-and-egg:** domain unknown until the service exists → set after Step 2.2, then **redeploy**. |
+   | `GEMINI_API_KEY` | paid key | Optional — mockup generation is inert until set. |
+
+   `PORT` is injected by Railway; `run()` binds it (`PORT` → `MCP_PORT` → `8100`). `FILES_DIR=/data/files`
+   and `MCP_BIND_HOST=0.0.0.0` are already set as Dockerfile ENV.
+4. **Redeploy** so `PUBLIC_FILES_BASE` + token take effect.
+
+### Step 3 — Wire Open WebUI → MCP
+
+In Open WebUI: **Admin → Settings → External Tools → add MCP (Streamable HTTP)**:
+- **URL:** `https://<mcp>.up.railway.app/mcp`
+- **Auth:** Bearer / API Key = the `MCP_AUTH_TOKEN` value.
+
+Save → the 5 tools (register_design, match_product, generate_mockups, refine_mockups,
+export_listing) appear.
+
+### Verify
+
+```bash
+curl -s https://<mcp>.up.railway.app/health                                   # {"ok": true}
+curl -s -o /dev/null -w "%{http_code}\n" https://<mcp>.up.railway.app/mcp     # 401 (no token)
+```
+Then confirm a returned `/files/{id}` link renders in the browser, and a tool call from Open
+WebUI succeeds (token accepted, streaming passes through the gate).
+
+---
+
 ## Unresolved Questions
 
 - Recommended vector DB for production (self-hosted vs managed)?

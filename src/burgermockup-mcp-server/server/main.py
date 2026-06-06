@@ -1,8 +1,9 @@
 """burgermockup-mcp-server — assembly.
 
-5 MCP tools over streamable HTTP (bind 127.0.0.1: the server has no auth, so
-it is never exposed beyond the local machine / compose network) plus three
-HTTP side-channels:
+5 MCP tools over streamable HTTP plus three HTTP side-channels. Locally it binds
+127.0.0.1 (loopback only). On a public host, set MCP_AUTH_TOKEN and the Bearer gate
+(server/auth_middleware.py) guards /mcp + the mutation routes; /health and /files stay
+open. Side-channels:
   POST /designs            multipart upload (browser path; avoids base64 inflation)
   GET  /files/{file_id}    UUID-validated file serving (never path-joined)
   POST /jobs/{job_id}/abort  host-controlled abort for in-flight generation
@@ -93,10 +94,21 @@ async def health(request: Request) -> JSONResponse:
 
 def run() -> None:
     file_store.init()
-    mcp.run(
-        transport="http",
+    # http_app() returns the Starlette ASGI app (serves /mcp + the custom routes) so we can
+    # layer the Bearer gate and bind the platform-injected port ourselves. mcp.run() can't do
+    # either: it owns port selection and exposes no hook for request-level auth.
+    from server.auth_middleware import BearerGateMiddleware
+
+    app = mcp.http_app()
+    app.add_middleware(BearerGateMiddleware)
+
+    import uvicorn
+
+    uvicorn.run(
+        app,
         host=os.environ.get("MCP_BIND_HOST", "127.0.0.1"),
-        port=int(os.environ.get("MCP_PORT", "8100")),
+        # Railway (and most PaaS) inject PORT; compose/dev fall back to MCP_PORT then 8100.
+        port=int(os.environ.get("PORT") or os.environ.get("MCP_PORT", "8100")),
     )
 
 

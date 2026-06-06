@@ -1,5 +1,27 @@
 # Project Changelog
 
+## [2026-06-06] MCP Server Railway Hosting Configuration
+
+### Added
+- **MCP Server Railway artifacts** (phases 01–02 complete)
+  - `src/burgermockup-mcp-server/server/auth_middleware.py` — pure-ASGI Bearer gate, constant-time HMAC compare, self-disables when `MCP_AUTH_TOKEN` unset, exempts `/health` + `/files/`
+  - `src/burgermockup-mcp-server/railway.toml` — config-as-code (builder Dockerfile, healthcheck `/health`, restart ON_FAILURE)
+  - Modified `src/burgermockup-mcp-server/server/main.py` — `mcp.http_app()` + middleware stack + PORT binding (Railway or fallback to MCP_PORT)
+  - `requirements.txt` — explicit uvicorn>=0.30
+
+### Verified
+- Pure-ASGI middleware avoids buffering SSE responses (streamable HTTP intact)
+- Server binds `$PORT` (Railway injected) or `$MCP_PORT` (local fallback) or 8100 (default)
+- Gate: `/mcp` 401 without valid token; `/health` + `/files/{id}` always open (UUID-keyed, unguessable)
+- Local compose unchanged (no token set → gate disabled)
+- 11 auth middleware tests passing; real fastmcp 3.4.1 boot verified
+
+### Next
+- Phase 03: Railway CLI deploy both services, env config, domain wiring
+- Phase 04: Smoke tests + deployment-guide update
+
+---
+
 ## [2026-06-06] MCP Server Migration & OpenWebUI Integration
 
 ### Added

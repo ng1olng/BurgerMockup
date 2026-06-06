@@ -3,6 +3,8 @@
 # versions. Bump only after re-running the spike.
 fastmcp==3.4.1
 mcp==1.27.2
+# Explicit: run() drives the ASGI app via uvicorn directly (pulled in by fastmcp anyway).
+uvicorn>=0.30,<1
 pillow==12.2.0
 httpx==0.28.1
 opencv-python-headless==4.*
