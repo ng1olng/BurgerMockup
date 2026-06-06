@@ -1,0 +1,532 @@
+[
+  {
+    "short_code": "USG5000",
+    "name": "Unisex T-Shirt | Gildan 5000",
+    "type": "tshirt",
+    "available_colors": [
+      {
+        "id": "__oavw-PWXYZ0JMm",
+        "name": "White",
+        "color_hex": "#ffffff"
+      },
+      {
+        "id": "W9LLlAZz5EyarJRE",
+        "name": "Dark Heather",
+        "color_hex": "#425563"
+      },
+      {
+        "id": "N7y1Ll4Duc1JmwMv",
+        "name": "Royal",
+        "color_hex": "#224D8F"
+      },
+      {
+        "id": "9rZWbLaLoY7E7ncj",
+        "name": "Coral Silk",
+        "color_hex": "#FB637E"
+      },
+      {
+        "id": "bSt4qUqK6fN3SVqT",
+        "name": "Purple",
+        "color_hex": "#432c72"
+      },
+      {
+        "id": "Y1vP9FwZEmenx1F0",
+        "name": "Light Blue",
+        "color_hex": "#A4C8E1"
+      },
+      {
+        "id": "b8NbB4r3p14XZwag",
+        "name": "Light Pink",
+        "color_hex": "#E4C6D4"
+      },
+      {
+        "id": "PsgttXZOnoVkteFq",
+        "name": "Orange",
+        "color_hex": "#F4633A"
+      },
+      {
+        "id": "rgFoViFA5efDVaVg",
+        "name": "Charcoal",
+        "color_hex": "#66676C"
+      },
+      {
+        "id": "GDycghMlzc2VGivR",
+        "name": "Dark Chocolate",
+        "color_hex": "#382F2D"
+      },
+      {
+        "id": "l0ixMqRyuRmqbOBf",
+        "name": "Carolina Blue",
+        "color_hex": "#7ba4db"
+      },
+      {
+        "id": "NBiDuaMwc6wegTCn",
+        "name": "Kiwi",
+        "color_hex": "#89A84F"
+      },
+      {
+        "id": "YZ9ifqzbMehLw0ay",
+        "name": "Irish Green",
+        "color_hex": "#00A74A"
+      },
+      {
+        "id": "4Os0n5aTnBGnYeM1",
+        "name": "Maroon",
+        "color_hex": "#5B2B42"
+      },
+      {
+        "id": "sKIK2eg6Q6rb594v",
+        "name": "Sand",
+        "color_hex": "#CABFAD"
+      },
+      {
+        "id": "U5X7qCcoq0AkLFvc",
+        "name": "Yellow",
+        "color_hex": "#F5E1A4"
+      },
+      {
+        "id": "a2diKzhOs8HsLj5M",
+        "name": "Gold",
+        "color_hex": "#EEAD1A"
+      },
+      {
+        "id": "B0bdxEy2r6rDDQyQ",
+        "name": "Military Green",
+        "color_hex": "#5E7461"
+      },
+      {
+        "id": "kCXDR4ADOTFbV7t3",
+        "name": "Sapphire",
+        "color_hex": "#0077B5"
+      },
+      {
+        "id": "M2BEldOfXmiraUFc",
+        "name": "Navy",
+        "color_hex": "#263147"
+      },
+      {
+        "id": "kSUYeIOCT1iHvJbY",
+        "name": "Ash",
+        "color_hex": "#C8C9C7"
+      },
+      {
+        "id": "mjSuITXhVfStJngW",
+        "name": "Red",
+        "color_hex": "#D50032"
+      },
+      {
+        "id": "tzAmGHYZUHYeQzux",
+        "name": "Sport Grey",
+        "color_hex": "#97999B"
+      },
+      {
+        "id": "iF8bbNuHhqGRZQYx",
+        "name": "Azalea",
+        "color_hex": "#DD74A1"
+      },
+      {
+        "id": "1cDuybZFzPDzdZD4",
+        "name": "Forest",
+        "color_hex": "#273B33"
+      },
+      {
+        "id": "p4R9fdJzVo7TpWRb",
+        "name": "Heather Navy",
+        "color_hex": "#333F48"
+      },
+      {
+        "id": "Q02wsAy2jDm5gKhv",
+        "name": "Cardinal Red",
+        "color_hex": "#8A1538"
+      },
+      {
+        "id": "SroazByrR1hew0rQ",
+        "name": "Violet",
+        "color_hex": "#8094DD"
+      },
+      {
+        "id": "bKRFUYMvI95J9bG3",
+        "name": "Graphite Heather",
+        "color_hex": "#707372"
+      },
+      {
+        "id": "n259B3QTDgGCr5YA",
+        "name": "Turf Green",
+        "color_hex": "#007A3E"
+      },
+      {
+        "id": "aXfqadYab5qc5j2q",
+        "name": "Heliconia",
+        "color_hex": "#DB3E79"
+      },
+      {
+        "id": "NI11efBEFHyww9TQ",
+        "name": "Tropical Blue",
+        "color_hex": "#00859b"
+      },
+      {
+        "id": "BQE7iYsAomVAs1Uo",
+        "name": "Ice Grey",
+        "color_hex": "#D7D2CB"
+      },
+      {
+        "id": "n4G8MnSzfSmkMyxr",
+        "name": "Black",
+        "color_hex": "#25282A"
+      },
+      {
+        "id": "mvhIGIWNrLDEcfYs",
+        "name": "Natural",
+        "color_hex": "#E7CEB5"
+      }
+    ],
+    "print_areas": [
+      {
+        "name": "front",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "back",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "sleeve",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      }
+    ],
+    "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG5000.png",
+    "resolution_default": "4200x4800"
+  },
+  {
+    "short_code": "USG2200",
+    "name": "Unisex Tank Top | Gildan 2200",
+    "type": "tshirt",
+    "available_colors": [
+      {
+        "id": "__oavw-PWXYZ0JMm",
+        "name": "White",
+        "color_hex": "#ffffff"
+      },
+      {
+        "id": "M2BEldOfXmiraUFc",
+        "name": "Navy",
+        "color_hex": "#263147"
+      },
+      {
+        "id": "tzAmGHYZUHYeQzux",
+        "name": "Sport Grey",
+        "color_hex": "#97999B"
+      },
+      {
+        "id": "MGvaopybgIPRQSv2",
+        "name": "Ash",
+        "color_hex": "#C8C9C7"
+      },
+      {
+        "id": "n4G8MnSzfSmkMyxr",
+        "name": "Black",
+        "color_hex": "#25282A"
+      }
+    ],
+    "print_areas": [
+      {
+        "name": "front",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "back",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      }
+    ],
+    "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG2200.png",
+    "resolution_default": "4200x4800"
+  },
+  {
+    "short_code": "USG18500",
+    "name": "Unisex Hoodie | Gildan 18500",
+    "type": "tshirt",
+    "available_colors": [
+      {
+        "id": "__oavw-PWXYZ0JMm",
+        "name": "White",
+        "color_hex": "#ffffff"
+      },
+      {
+        "id": "W9LLlAZz5EyarJRE",
+        "name": "Dark Heather",
+        "color_hex": "#425563"
+      },
+      {
+        "id": "N7y1Ll4Duc1JmwMv",
+        "name": "Royal",
+        "color_hex": "#224D8F"
+      },
+      {
+        "id": "Y1vP9FwZEmenx1F0",
+        "name": "Light Blue",
+        "color_hex": "#A4C8E1"
+      },
+      {
+        "id": "b8NbB4r3p14XZwag",
+        "name": "Light Pink",
+        "color_hex": "#E4C6D4"
+      },
+      {
+        "id": "PsgttXZOnoVkteFq",
+        "name": "Orange",
+        "color_hex": "#F4633A"
+      },
+      {
+        "id": "rgFoViFA5efDVaVg",
+        "name": "Charcoal",
+        "color_hex": "#66676C"
+      },
+      {
+        "id": "l0ixMqRyuRmqbOBf",
+        "name": "Carolina Blue",
+        "color_hex": "#7ba4db"
+      },
+      {
+        "id": "YZ9ifqzbMehLw0ay",
+        "name": "Irish Green",
+        "color_hex": "#00A74A"
+      },
+      {
+        "id": "4Os0n5aTnBGnYeM1",
+        "name": "Maroon",
+        "color_hex": "#5B2B42"
+      },
+      {
+        "id": "sKIK2eg6Q6rb594v",
+        "name": "Sand",
+        "color_hex": "#CABFAD"
+      },
+      {
+        "id": "owUZSjmhXkLMV5sb",
+        "name": "Graphite Heather",
+        "color_hex": "#707372"
+      },
+      {
+        "id": "a2diKzhOs8HsLj5M",
+        "name": "Gold",
+        "color_hex": "#EEAD1A"
+      },
+      {
+        "id": "B0bdxEy2r6rDDQyQ",
+        "name": "Military Green",
+        "color_hex": "#5E7461"
+      },
+      {
+        "id": "M2BEldOfXmiraUFc",
+        "name": "Navy",
+        "color_hex": "#263147"
+      },
+      {
+        "id": "kSUYeIOCT1iHvJbY",
+        "name": "Ash",
+        "color_hex": "#C8C9C7"
+      },
+      {
+        "id": "mjSuITXhVfStJngW",
+        "name": "Red",
+        "color_hex": "#D50032"
+      },
+      {
+        "id": "tzAmGHYZUHYeQzux",
+        "name": "Sport Grey",
+        "color_hex": "#97999B"
+      },
+      {
+        "id": "1cDuybZFzPDzdZD4",
+        "name": "Forest",
+        "color_hex": "#273B33"
+      },
+      {
+        "id": "AqDzQDa85aGVvefC",
+        "name": "Purple",
+        "color_hex": "#432c72"
+      },
+      {
+        "id": "aXfqadYab5qc5j2q",
+        "name": "Heliconia",
+        "color_hex": "#DB3E79"
+      },
+      {
+        "id": "ak72U0TTFaqgczPe",
+        "name": "Heather Sport Dark Navy",
+        "color_hex": "#595478"
+      },
+      {
+        "id": "n4G8MnSzfSmkMyxr",
+        "name": "Black",
+        "color_hex": "#25282A"
+      },
+      {
+        "id": "74kxgzkEg8blJB51",
+        "name": "Safety Orange",
+        "color_hex": "#ff7302"
+      }
+    ],
+    "print_areas": [
+      {
+        "name": "front",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "back",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "sleeve",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      }
+    ],
+    "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG18500.png",
+    "resolution_default": "4200x4800"
+  },
+  {
+    "short_code": "USG18000",
+    "name": "Unisex Crewneck Sweatshirt | Gildan 18000",
+    "type": "tshirt",
+    "available_colors": [
+      {
+        "id": "__oavw-PWXYZ0JMm",
+        "name": "White",
+        "color_hex": "#ffffff"
+      },
+      {
+        "id": "W9LLlAZz5EyarJRE",
+        "name": "Dark Heather",
+        "color_hex": "#425563"
+      },
+      {
+        "id": "N7y1Ll4Duc1JmwMv",
+        "name": "Royal",
+        "color_hex": "#224D8F"
+      },
+      {
+        "id": "bSt4qUqK6fN3SVqT",
+        "name": "Purple",
+        "color_hex": "#432c72"
+      },
+      {
+        "id": "Y1vP9FwZEmenx1F0",
+        "name": "Light Blue",
+        "color_hex": "#A4C8E1"
+      },
+      {
+        "id": "b8NbB4r3p14XZwag",
+        "name": "Light Pink",
+        "color_hex": "#E4C6D4"
+      },
+      {
+        "id": "PsgttXZOnoVkteFq",
+        "name": "Orange",
+        "color_hex": "#F4633A"
+      },
+      {
+        "id": "YZ9ifqzbMehLw0ay",
+        "name": "Irish Green",
+        "color_hex": "#00A74A"
+      },
+      {
+        "id": "4Os0n5aTnBGnYeM1",
+        "name": "Maroon",
+        "color_hex": "#5B2B42"
+      },
+      {
+        "id": "sKIK2eg6Q6rb594v",
+        "name": "Sand",
+        "color_hex": "#CABFAD"
+      },
+      {
+        "id": "owUZSjmhXkLMV5sb",
+        "name": "Graphite Heather",
+        "color_hex": "#707372"
+      },
+      {
+        "id": "a2diKzhOs8HsLj5M",
+        "name": "Gold",
+        "color_hex": "#EEAD1A"
+      },
+      {
+        "id": "B0bdxEy2r6rDDQyQ",
+        "name": "Military Green",
+        "color_hex": "#5E7461"
+      },
+      {
+        "id": "M2BEldOfXmiraUFc",
+        "name": "Navy",
+        "color_hex": "#263147"
+      },
+      {
+        "id": "kSUYeIOCT1iHvJbY",
+        "name": "Ash",
+        "color_hex": "#C8C9C7"
+      },
+      {
+        "id": "mjSuITXhVfStJngW",
+        "name": "Red",
+        "color_hex": "#D50032"
+      },
+      {
+        "id": "tzAmGHYZUHYeQzux",
+        "name": "Sport Grey",
+        "color_hex": "#97999B"
+      },
+      {
+        "id": "1cDuybZFzPDzdZD4",
+        "name": "Forest",
+        "color_hex": "#273B33"
+      },
+      {
+        "id": "aXfqadYab5qc5j2q",
+        "name": "Heliconia",
+        "color_hex": "#DB3E79"
+      },
+      {
+        "id": "n4G8MnSzfSmkMyxr",
+        "name": "Black",
+        "color_hex": "#25282A"
+      }
+    ],
+    "print_areas": [
+      {
+        "name": "front",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "back",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      },
+      {
+        "name": "sleeve",
+        "quad": [],
+        "mesh": null,
+        "source": "api"
+      }
+    ],
+    "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG18000.png",
+    "resolution_default": "4200x4800"
+  }
+]
