@@ -1,0 +1,30 @@
+# Deploys the BurgerMockup MCP server to Railway via CLI.
+# See deploy-open-webui-railway.yml for why CLI deploys are used here.
+name: Deploy mcp-server to Railway
+
+on:
+  push:
+    branches: [main]
+    paths: ['burgermockup-mcp-server/**']
+
+# A newer push cancels an in-flight deploy of the same service.
+concurrency:
+  group: railway-mcp-server
+  cancel-in-progress: true
+
+# Deploy uses RAILWAY_TOKEN only; the default GITHUB_TOKEN is not needed.
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm i -g @railway/cli
+      # working-directory = build context: the service Dockerfile is at this
+      # root; PORT/volume/env config lives on the Railway service itself.
+      - run: railway up --service mcp-server --ci
+        working-directory: burgermockup-mcp-server
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
