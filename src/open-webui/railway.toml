@@ -7,8 +7,16 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# Monorepo: rebuild this service ONLY when its own files change.
+# Without this, every push to the repo rebuilds open-webui (a 15-20 min build)
+# even when only a sibling service was touched. Paths are repo-root-relative.
+watchPatterns = ["src/open-webui/**"]
 
 [deploy]
+# Single replica is mandatory: SQLite DB, the attached volume, and the default
+# in-memory socket manager all break with >1 replica. Scaling out requires
+# DATABASE_URL (Postgres) + REDIS_URL + websocket manager — see deployment-guide.md.
+numReplicas = 1
 # First boot runs Alembic migrations (+ may download embedding model on slim builds).
 healthcheckPath = "/health"
 healthcheckTimeout = 600
