@@ -433,3 +433,9 @@
 {"mockup_id":"a39b6dac-a0d2-45c6-a8be-f1004709f281","prompt":"flat","model":"flat-cv","latency_ms":248,"cost_usd":0.0,"timestamp":"2026-06-06T21:12:21+00:00"}
 {"mockup_id":"a39b6dac-a0d2-45c6-a8be-f1004709f281","prompt":"flat","model":"flat-cv","latency_ms":260,"cost_usd":0.0,"timestamp":"2026-06-06T21:12:22+00:00"}
 {"mockup_id":"a39b6dac-a0d2-45c6-a8be-f1004709f281","prompt":"flat","model":"flat-cv","latency_ms":255,"cost_usd":0.0,"timestamp":"2026-06-06T21:12:22+00:00"}
+{"mockup_id":"7f7de656-4625-4045-b299-3e9a5e86ba75","prompt":"studio white background","model":"gemini-2.5-flash-image","ssim":0.9856,"latency_ms":16404,"cost_usd":0.039,"timestamp":"2026-06-06T17:26:28+00:00"}
+{"mockup_id":"b5aa2522-63a4-4895-9648-f2c7fbc82c24","prompt":"studio white background","model":"gemini-2.5-flash-image","ssim":0.9805,"latency_ms":20081,"cost_usd":0.039,"timestamp":"2026-06-06T17:26:48+00:00"}
+{"mockup_id":"3db78c5d-0338-43e1-a45a-dca5ea784fa7","prompt":"studio white background","model":"gemini-2.5-flash-image","ssim":0.936,"latency_ms":22072,"cost_usd":0.039,"timestamp":"2026-06-06T17:41:44+00:00"}
+{"mockup_id":"a639351a-1e6b-4e3e-926c-64a48637cbd0","prompt":"studio white background","model":"gemini-2.5-flash-image","ssim":0.9433,"latency_ms":10813,"cost_usd":0.039,"timestamp":"2026-06-06T17:41:55+00:00"}
+{"mockup_id":"2a6b783e-90f6-4d3d-bd3d-f75ce9645d4a","prompt":"flat","model":"flat-cv","ssim":0.9921,"latency_ms":446,"cost_usd":0.0,"timestamp":"2026-06-06T17:45:40+00:00"}
+{"mockup_id":"b118f641-c81a-4c0b-be5f-2187c6eacea3","prompt":"flat","model":"flat-cv","ssim":0.985,"latency_ms":4728,"cost_usd":0.0,"timestamp":"2026-06-06T18:07:09+00:00"}

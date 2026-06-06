@@ -42,7 +42,52 @@ from server.tools.design_tools import register_design
 from server.tools.export_tools import export_listing
 from server.tools.mockup_tools import generate_mockups, refine_mockups
 
-mcp = FastMCP("burgermockup")
+mcp = FastMCP(
+    "burgermockup",
+    instructions=(
+        "BurgerMockup — AI mockup generator for print-on-demand products.\n\n"
+        "## Required call order\n\n"
+        "1. **match_product(query)** — resolve a natural-language product name (VN or EN) to a "
+        "`product_id`. Always run this first; never guess a product_id.\n\n"
+        "2. **register_design(image_base64, filename)** — upload the seller's design image and "
+        "receive a `design_id`. Skip this step only if the message already contains a "
+        "`design registered: design_id=...` annotation (injected automatically by the "
+        "BurgerMockup design-bridge filter when the user attaches an image).\n\n"
+        "3. **generate_mockups(job_id, design_id, product_id, scene_specs, n)** — generate up "
+        "to 8 variants. Requires both `design_id` (step 2) and `product_id` (step 1). "
+        "Use a fresh UUID for `job_id`. Each ready variant in the result contains a `url` — "
+        "render it inline: ![variant](url).\n\n"
+        "4. **refine_mockups(...)** — optional follow-up to adjust design scale, regenerate "
+        "scenes, or swap the product. Pass the `variants` list returned by step 3.\n\n"
+        "5. **export_listing(variant_ids)** — not yet available; returns not_implemented.\n\n"
+        "## Example — 'Tạo tshirt với design này, áo màu trắng'\n\n"
+        "User attaches an image and asks to create a white t-shirt mockup.\n\n"
+        "```\n"
+        "# Step 1 — design_id already injected by the filter (image was attached):\n"
+        "# [design registered: design_id=abc123 ...] ← read from message, skip register_design\n\n"
+        "# Step 2 — resolve product\n"
+        "match_product(query='tshirt trắng')\n"
+        "# → product_id='unisex-tshirt-01'\n\n"
+        "# Step 3 — generate mockup with white color hint in scene_specs\n"
+        "generate_mockups(\n"
+        "    job_id='<uuid>',\n"
+        "    design_id='abc123',\n"
+        "    product_id='unisex-tshirt-01',\n"
+        "    scene_specs=[{'setting': 'studio white background', 'lighting': 'soft'}],\n"
+        "    n=2\n"
+        ")\n"
+        "# → display each variant url as ![variant](url)\n"
+        "```\n\n"
+        "## Rules\n"
+        "- Never call generate_mockups without a registered design_id.\n"
+        "- Never fabricate product_id; always call match_product first.\n"
+        "- When user mentions a color (trắng/đen/xanh/...), pass it as `setting` or `mood` in "
+        "scene_specs — do NOT pass it as a separate tool argument.\n"
+        "- Never pass caller-supplied strings as negative_constraints; these are injected "
+        "server-side automatically.\n"
+        "- Display every variant url as a markdown image immediately after generation."
+    ),
+)
 # Logs every MCP request/tool call with args. Payloads here are IDs and scene
 # specs only — never secrets or image bytes — so they are safe on the console.
 mcp.add_middleware(LoggingMiddleware(include_payloads=True))
