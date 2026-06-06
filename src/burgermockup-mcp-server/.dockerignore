@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+files/
+files-e2e/
+metrics/
+tests/
+.env
+.pytest_cache/

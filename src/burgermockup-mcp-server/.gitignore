@@ -1,0 +1,14 @@
+# runtime artifacts — UUID-keyed generated designs/mockups
+files/
+
+# secrets — never commit real keys
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# quad annotation overlays (debug visualizations, regenerable)
+server/catalog/data/bases/*_quad_check.png
