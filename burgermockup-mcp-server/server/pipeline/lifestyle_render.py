@@ -14,7 +14,7 @@ from PIL import Image
 
 from server.pipeline import metrics, scene_cache, scene_gen
 from server.pipeline.compositor import composite
-from server.pipeline.flat_render import GateFailure, _load_rgba
+from server.pipeline.flat_render import GateFailure, _load_rgba, flatten_over_white
 from server.pipeline.prompts import scene_prompt
 from server.pipeline.ssim_gate import score, threshold_for
 from server.pipeline.upscale import upscale_base
@@ -33,7 +33,7 @@ async def _obtain_scene(scene_id: str, base_path: str,
         asset, rgba = cached
         return rgba, [tuple(p) for p in asset.print_quad], 0.0
 
-    base = _load_rgba(base_path)
+    base = flatten_over_white(_load_rgba(base_path))
     up_base, up_quad = upscale_base(base, quad)
     scene_img, cost = await scene_gen.generate_scene(
         scene_prompt(spec), Image.fromarray(up_base))

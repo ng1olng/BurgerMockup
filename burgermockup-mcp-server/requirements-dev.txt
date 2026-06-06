@@ -1,0 +1,6 @@
+# Dev/test-only deps. aiohttp is NOT a server runtime dep — the OWUI
+# design-bridge filter (integrations/) runs inside the Open WebUI backend,
+# which ships aiohttp; it's needed here only so the filter's tests run
+# instead of import-skipping.
+-r requirements.txt
+aiohttp
