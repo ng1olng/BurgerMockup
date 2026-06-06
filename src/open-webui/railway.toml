@@ -1,0 +1,18 @@
+# Railway config-as-code for the vendored open-webui service.
+# Dashboard prerequisites (cannot be expressed here):
+#   - Root Directory = src/open-webui  (build context must be this directory)
+#   - Config-as-code path = src/open-webui/railway.toml  (config file does NOT follow Root Directory)
+# See docs/deployment-guide.md -> "Hosting on Railway".
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# First boot runs Alembic migrations (+ may download embedding model on slim builds).
+healthcheckPath = "/health"
+healthcheckTimeout = 600
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# No startCommand: Dockerfile CMD ["bash", "start.sh"] with WORKDIR /app/backend is correct.
