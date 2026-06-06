@@ -353,3 +353,4 @@
 {"mockup_id":"c9291033-6dbb-4b27-96d5-2a57e1cc8cdc","prompt":"flat","model":"flat-cv","latency_ms":235,"cost_usd":0.0,"timestamp":"2026-06-06T21:06:58+00:00"}
 {"mockup_id":"c9291033-6dbb-4b27-96d5-2a57e1cc8cdc","prompt":"flat","model":"flat-cv","latency_ms":237,"cost_usd":0.0,"timestamp":"2026-06-06T21:06:58+00:00"}
 {"mockup_id":"c9291033-6dbb-4b27-96d5-2a57e1cc8cdc","prompt":"flat","model":"flat-cv","latency_ms":232,"cost_usd":0.0,"timestamp":"2026-06-06T21:06:58+00:00"}
+{"mockup_id":"5b68d6ff-d889-4279-893b-a1f28dfe9064","prompt":"cafe","model":"gemini-2.5-flash-image","latency_ms":11296,"cost_usd":0.039,"timestamp":"2026-06-06T21:07:21+00:00"}
