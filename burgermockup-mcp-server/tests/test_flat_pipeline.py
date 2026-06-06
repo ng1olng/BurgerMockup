@@ -1,6 +1,6 @@
-"""Flat pipeline must-have tests: golden composite passes the integrity gate
-end-to-end through the tool; a corrupted composite is retried then rejected
-(with metrics rows for pass AND fail); output meets the size floor."""
+"""Flat pipeline must-have tests: golden composite renders end-to-end through
+the tool (with a metrics row); output meets the size floor; background stays
+white; renders are byte-deterministic and fast."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pytest
 from fastmcp import Client
 from PIL import Image, ImageDraw
 
-from server.pipeline import flat_render, metrics
+from server.pipeline import metrics
 from server.storage import file_store
 from server.main import mcp
 
@@ -28,8 +28,7 @@ def _isolated_dirs(tmp_path, monkeypatch):
 
 
 def _logo_b64() -> str:
-    """Detail-rich test design: text-like strokes + shapes on transparency
-    (a solid square would pass SSIM trivially; this one has fine structure)."""
+    """Detail-rich test design: text-like strokes + shapes on transparency."""
     im = Image.new("RGBA", (400, 300), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     d.rectangle([10, 10, 390, 290], outline=(20, 40, 160, 255), width=6)
@@ -58,11 +57,11 @@ async def _generate_one(client) -> tuple[dict, list[dict]]:
     return res.data["variants"][0], events
 
 
-async def test_golden_flat_composite_passes_gate():
+async def test_golden_flat_composite_renders():
     async with Client(mcp) as client:
         variant, events = await _generate_one(client)
         assert variant["status"] == "ready"
-        assert variant["ssim"] >= 0.93, f"internal margin not met: {variant['ssim']}"
+        assert variant["url"]
 
         ready = [e for e in events if e["event"] == "variant_ready"][0]
         file_id = ready["url"].rsplit("/", 1)[-1]
@@ -70,39 +69,7 @@ async def test_golden_flat_composite_passes_gate():
         assert min(out.size) >= 1500  # output size floor
 
         rows = [json.loads(l) for l in open(metrics.METRICS_PATH)]
-        assert len(rows) == 1 and rows[0]["ssim"] >= 0.93 and rows[0]["cost_usd"] == 0.0
-
-
-async def test_corrupted_composite_is_rejected_with_metrics(monkeypatch):
-    # Force the gate to score every composite below threshold: simulates a
-    # corrupting composite path. Both retry passes must fail -> variant_failed.
-    monkeypatch.setattr(flat_render, "score", lambda *a, **k: 0.41)
-    async with Client(mcp) as client:
-        variant, events = await _generate_one(client)
-        assert variant["status"] == "failed"
-        failed = [e for e in events if e["event"] == "variant_failed"]
-        assert failed and failed[0]["message"] == \
-            "design integrity could not be preserved for this variant"
-        rows = [json.loads(l) for l in open(metrics.METRICS_PATH)]
-        assert rows and rows[-1]["ssim"] == 0.41  # fail row logged too
-
-
-async def test_text_heavy_raises_threshold(monkeypatch, tmp_path):
-    # A 0.94 composite passes the normal flat gate (0.93) but must FAIL the
-    # text-heavy gate (0.95) — proves the stricter threshold actually engages.
-    monkeypatch.setattr(flat_render, "score", lambda *a, **k: 0.94)
-    logo = tmp_path / "logo.png"
-    Image.new("RGBA", (100, 100), (255, 0, 0, 255)).save(logo)
-    from server.catalog.store import base_image_path
-    import json as _json
-    quad = [tuple(p) for p in
-            _json.load(open("server/catalog/data/quads.json"))["USG5000"]["front"]]
-    ok = flat_render.render_flat(str(logo), base_image_path("USG5000"), quad,
-                                 text_heavy=False)
-    assert ok["ssim"] == 0.94
-    with pytest.raises(flat_render.GateFailure):
-        flat_render.render_flat(str(logo), base_image_path("USG5000"), quad,
-                                text_heavy=True)
+        assert len(rows) == 1 and rows[0]["cost_usd"] == 0.0
 
 
 async def test_design_meta_persisted_and_threaded():
@@ -142,7 +109,11 @@ async def test_flat_render_is_deterministic_and_fast():
     async with Client(mcp) as client:
         v1, e1 = await _generate_one(client)
         v2, e2 = await _generate_one(client)
-        assert v1["ssim"] == v2["ssim"]  # same input -> same score
-        ready = [e for e in e1 if e["event"] == "variant_ready"][0]
-        assert ready["latency_ms"] < 2000  # <2s/variant requirement
-        assert os.path.exists(file_store.resolve(ready["url"].rsplit("/", 1)[-1]))
+        ready1 = [e for e in e1 if e["event"] == "variant_ready"][0]
+        ready2 = [e for e in e2 if e["event"] == "variant_ready"][0]
+        # Same input -> byte-identical output (determinism guarantee).
+        img1 = open(file_store.resolve(ready1["url"].rsplit("/", 1)[-1]), "rb").read()
+        img2 = open(file_store.resolve(ready2["url"].rsplit("/", 1)[-1]), "rb").read()
+        assert img1 == img2
+        assert ready1["latency_ms"] < 2000  # <2s/variant requirement
+        assert os.path.exists(file_store.resolve(ready1["url"].rsplit("/", 1)[-1]))

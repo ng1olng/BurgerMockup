@@ -12,10 +12,10 @@ from server.contracts import MetricsRow
 METRICS_PATH = os.environ.get("METRICS_PATH", "metrics/metrics.jsonl")
 
 
-def log_variant(mockup_id: str, prompt: str, model: str, ssim: float,
+def log_variant(mockup_id: str, prompt: str, model: str,
                 latency_ms: int, cost_usd: float) -> None:
     row = MetricsRow(
-        mockup_id=mockup_id, prompt=prompt, model=model, ssim=round(ssim, 4),
+        mockup_id=mockup_id, prompt=prompt, model=model,
         latency_ms=latency_ms, cost_usd=cost_usd,
         timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )

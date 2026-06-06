@@ -2,7 +2,6 @@
   {
     "short_code": "USG5000",
     "name": "Unisex T-Shirt | Gildan 5000",
-    "type": "tshirt",
     "available_colors": [
       {
         "id": "__oavw-PWXYZ0JMm",
@@ -180,33 +179,12 @@
         "color_hex": "#E7CEB5"
       }
     ],
-    "print_areas": [
-      {
-        "name": "front",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "back",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "sleeve",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      }
-    ],
     "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG5000.png",
     "resolution_default": "4200x4800"
   },
   {
     "short_code": "USG2200",
     "name": "Unisex Tank Top | Gildan 2200",
-    "type": "tshirt",
     "available_colors": [
       {
         "id": "__oavw-PWXYZ0JMm",
@@ -234,27 +212,12 @@
         "color_hex": "#25282A"
       }
     ],
-    "print_areas": [
-      {
-        "name": "front",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "back",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      }
-    ],
     "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG2200.png",
     "resolution_default": "4200x4800"
   },
   {
     "short_code": "USG18500",
     "name": "Unisex Hoodie | Gildan 18500",
-    "type": "tshirt",
     "available_colors": [
       {
         "id": "__oavw-PWXYZ0JMm",
@@ -377,33 +340,12 @@
         "color_hex": "#ff7302"
       }
     ],
-    "print_areas": [
-      {
-        "name": "front",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "back",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "sleeve",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      }
-    ],
     "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG18500.png",
     "resolution_default": "4200x4800"
   },
   {
     "short_code": "USG18000",
     "name": "Unisex Crewneck Sweatshirt | Gildan 18000",
-    "type": "tshirt",
     "available_colors": [
       {
         "id": "__oavw-PWXYZ0JMm",
@@ -504,26 +446,6 @@
         "id": "n4G8MnSzfSmkMyxr",
         "name": "Black",
         "color_hex": "#25282A"
-      }
-    ],
-    "print_areas": [
-      {
-        "name": "front",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "back",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
-      },
-      {
-        "name": "sleeve",
-        "quad": [],
-        "mesh": null,
-        "source": "api"
       }
     ],
     "base_url": "https://d1ud88wu9m1k4s.cloudfront.net/assets/base-mockups/burgerprints/062025/USG18000.png",

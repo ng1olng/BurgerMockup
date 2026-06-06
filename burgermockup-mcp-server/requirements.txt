@@ -10,7 +10,6 @@ opencv-python-headless==4.*
 # only surfaces at the first live lifestyle call (degrades silently to flat).
 google-genai==2.8.0
 python-dotenv>=1.0
-scikit-image==0.*
 numpy==2.*
 pytest==8.*
 pytest-asyncio==0.*
