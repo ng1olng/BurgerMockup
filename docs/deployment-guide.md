@@ -528,6 +528,7 @@ Key metrics:
 | **RAG search returns nothing** | Check `VECTOR_DB` type and embedding model | Ensure documents uploaded + indexed |
 | **WebSocket timeout** | Reverse proxy timeout too short | Increase proxy timeout to 3600s |
 | **Out of memory** | Check container limits | Increase Docker memory limit or reduce model size |
+| **Railway: "Railpack could not determine how to build the app" / "Script start.sh not found"** | Build log shows repo root contents (`.claude/`, `docs/`, `src/`) — build context is wrong | Set **Root Directory** = `src/open-webui` in service settings (and Config-as-code path = `src/open-webui/railway.toml`); for CLI use `railway up ./src/open-webui` |
 
 ### Debug Mode
 
@@ -540,6 +541,107 @@ export LOG_LEVEL=DEBUG
 environment:
   LOG_LEVEL: DEBUG
 ```
+
+---
+
+## Hosting on Railway
+
+Deploy the vendored copy (`src/open-webui/`) to [Railway](https://railway.com) as a single container service. Strategy: Railway builds the Dockerfile directly with `USE_SLIM=true`, SQLite persisted on a Railway volume, LLM served by an external API (no GPU on Railway — bundled Ollama not viable).
+
+### Prerequisites
+
+- Railway account (Hobby plan or above — needs volume support + enough build resources)
+- This repo pushed to GitHub (Railway deploys from the GitHub repo)
+- Optional: an OpenAI-compatible API key OR an externally reachable Ollama host
+
+### Config-as-Code (`src/open-webui/railway.toml`)
+
+Build/deploy behavior is pinned in `src/open-webui/railway.toml` (builder `DOCKERFILE`, healthcheck `/health` with 600s timeout, `ON_FAILURE` restart). Two settings **cannot** live in the toml and MUST be set in the dashboard:
+
+| Dashboard setting | Value | Why |
+|-------------------|-------|-----|
+| **Root Directory** (Settings → Source) | `src/open-webui` | Sets the build context — the Dockerfile's `COPY` paths assume it. Without this, Railpack analyzes the repo root and fails with *"could not determine how to build the app"*. |
+| **Config-as-code path** (Settings) | `src/open-webui/railway.toml` | Railway does NOT resolve the config file relative to Root Directory — the path is from repo root. |
+
+> ⚠️ Plain `railway up` from the repo root uploads the wrong context and reproduces the Railpack failure. Use GitHub-connected deploys; for CLI experiments run `railway up ./src/open-webui`.
+
+### Step 1 — Create the Service
+
+1. Railway dashboard → **New Project** → **Deploy from GitHub repo** → select this repo
+2. Service → **Settings** → **Source**:
+   - **Root Directory**: `src/open-webui` (Railway then auto-detects the `Dockerfile` there)
+3. Service → **Settings** → set **Config-as-code path** to `src/open-webui/railway.toml`
+4. Build args (add under *Variables* — Railway passes service variables to Dockerfile builds automatically where `ARG` is declared):
+
+| Build Arg | Value | Why |
+|-----------|-------|-----|
+| `USE_SLIM` | `true` | Skips pre-baked embedding/whisper/tiktoken models. Full image is ~5 GB — risks Railway image-size limits and build timeouts. Slim ≈ 1.5–2 GB. RAG embedding model downloads at runtime into the volume instead. |
+| `USE_CUDA` | `false` (default) | No GPU on Railway. |
+| `USE_OLLAMA` | `false` (default) | Bundled Ollama impractical without GPU + adds GBs. |
+
+Expect **~15–20 min** per build (frontend npm build + pip install). Subsequent builds reuse layer cache when dependencies don't change.
+
+### Step 2 — Attach a Volume
+
+1. Right-click service → **Attach Volume**
+2. **Mount path**: `/app/backend/data`
+
+This persists: SQLite DB (`webui.db`), uploaded files, vector DB (Chroma default), and runtime-downloaded embedding models. Without it, **all data is wiped on every redeploy**.
+
+> Railway volumes attach to a single replica — keep **replicas = 1** (also required by SQLite + the default in-memory socket manager).
+
+### Step 3 — Set Environment Variables
+
+Service → **Variables**:
+
+| Variable | Value | Required | Notes |
+|----------|-------|----------|-------|
+| `WEBUI_SECRET_KEY` | long random string (`openssl rand -hex 32`) | **Yes** | ⚠️ If unset, `start.sh` generates a key into the container filesystem (NOT the volume) — every redeploy invalidates all sessions/JWTs. |
+| `ENV` | `prod` | Yes | Production mode. |
+| `FORWARDED_ALLOW_IPS` | `*` | Yes | Railway terminates TLS at its proxy; uvicorn must trust forwarded headers. |
+| `WEBUI_URL` | `https://<your-domain>.up.railway.app` | Recommended | Correct links in emails/shares. |
+| `ENABLE_PERSISTENT_CONFIG` | `true` (default) | — | Config stored in DB on the volume. |
+
+`PORT` is injected by Railway automatically — `backend/start.sh:33` (`PORT="${PORT:-8080}"`) honors it. No override needed.
+
+#### LLM Backend (pick one when ready)
+
+| Option | Variables |
+|--------|-----------|
+| OpenAI-compatible API (OpenAI, OpenRouter, etc.) | `OPENAI_API_BASE_URL=https://api.openai.com/v1`, `OPENAI_API_KEY=sk-...` |
+| External Ollama (home server / GPU VPS, must be reachable over HTTPS) | `OLLAMA_BASE_URL=https://ollama.example.com` |
+
+Both can also be configured later in **Admin Panel → Settings → Connections** (persisted to the volume-backed DB).
+
+### Step 4 — Networking & Health Check
+
+1. Service → **Settings** → **Networking** → **Generate Domain** (public HTTPS URL)
+2. Service → **Settings** → **Deploy**:
+   - **Healthcheck Path**: `/health`
+   - **Healthcheck Timeout**: ≥ 300s (first boot runs Alembic migrations + may download the embedding model)
+
+### Step 5 — First Boot
+
+1. Open the generated domain → **Sign up** — the **first account becomes admin**
+2. Verify version in **Admin Panel → Settings → About** (expect v0.9.6)
+3. Wire up the LLM connection (Step 3 table) and send a test chat
+
+### Railway Caveats
+
+| Caveat | Detail |
+|--------|--------|
+| **Single replica only** | SQLite + volume + in-memory socket manager all break with >1 replica. Scaling out requires `DATABASE_URL` (Postgres), `REDIS_URL` + websocket manager, and external vector DB — see scale-up path. |
+| **Build time** | ~15–20 min per push. Acceptable for a mockup; for faster iteration move builds to GitHub Actions → GHCR and have Railway deploy the image instead. |
+| **Volume backups** | Railway volume snapshots are manual — back up `webui.db` periodically (Railway CLI `railway ssh` + `sqlite3 .backup`, or download via admin DB export). |
+| **Cold RAG start** | Slim image downloads the embedding model (~80 MB, `all-MiniLM-L6-v2`) on first RAG use — one-time delay, cached on the volume. |
+| **Egress costs** | LLM API traffic + model downloads count toward Railway egress. |
+
+### Scale-Up Path (when mockup outgrows this)
+
+1. **Railway Postgres** service → set `DATABASE_URL` (migrates off SQLite)
+2. **Railway Redis** service → set `REDIS_URL` + `WEBSOCKET_MANAGER=redis` (enables multi-replica websockets)
+3. External vector DB (e.g. pgvector on the same Postgres: `VECTOR_DB=pgvector`)
+4. CI-built images: GitHub Actions → GHCR → Railway image deploys (cuts deploy time to ~1 min)
 
 ---
 
