@@ -15,3 +15,4 @@ HEALTHCHECK --interval=5s --timeout=3s --retries=10 \
   CMD python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8100/health')"
 
 CMD ["python", "-m", "server.main"]
+# Deployed on Railway: service 'mcp-server', CI via .github/workflows/deploy-mcp-server-railway.yml
