@@ -1,0 +1,36 @@
+# Overlay: burgermockup MCP server alongside Open WebUI.
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.mcp.yaml up -d --build
+#
+# Open WebUI connects via compose DNS: http://burgermockup-mcp:8100/mcp
+# (Admin > Settings > External Tools > MCP Streamable HTTP).
+services:
+  burgermockup-mcp:
+    build:
+      context: ../../burgermockup-mcp-server
+      dockerfile: Dockerfile
+    container_name: burgermockup-mcp
+    ports:
+      # Loopback only — the server has no auth. Published so the host browser
+      # can fetch /files/{id} links returned by the tools.
+      - 127.0.0.1:8100:8100
+    environment:
+      # File links render in the host browser, so the public base is the
+      # host-published address, not the compose-internal one.
+      - PUBLIC_FILES_BASE=http://127.0.0.1:8100
+      - GEMINI_API_KEY=${GEMINI_API_KEY-}
+      # Intentionally no env_file: the server's .env sets MCP_BIND_HOST=127.0.0.1
+      # (unreachable from other containers) and a relative FILES_DIR (dodges the
+      # volume). The Dockerfile's container-safe ENV values must win.
+    volumes:
+      - burgermockup-files:/data/files
+      - burgermockup-metrics:/data/metrics
+    restart: unless-stopped
+
+  open-webui:
+    depends_on:
+      burgermockup-mcp:
+        condition: service_healthy
+
+volumes:
+  burgermockup-files: {}
+  burgermockup-metrics: {}
