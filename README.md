@@ -17,6 +17,22 @@ python -m server.main
 ```
 Server binds to `http://127.0.0.1:8101/mcp`. OpenWebUI connects natively via `http://host.docker.internal:8101/mcp` from Docker containers. Port 8101 avoids colliding with the hack-burger dev copy on 8100 (set in `.env`).
 
+### Design Bridge Filter (chat image → design_id)
+
+Chat-attached images never reach MCP tool params (the model can't emit image bytes), so
+`integrations/owui_design_bridge_filter.py` must be installed in Open WebUI as a Filter
+function: its `inlet` uploads attached images to the MCP server's `POST /designs` and
+injects the returned `design_id` into the message so the model can call
+`match_product` / `generate_mockups`.
+
+Install (Admin → Functions → `+` → paste the file, or `POST /api/v1/functions/create`),
+enable it, then on the model (Admin → Models → edit):
+- **Filters**: enable `BurgerMockup Design Bridge`
+- **Advanced Params → Function Calling: Native** — required; the `default` mode's
+  prompt-based tool selector silently drops MCP tools
+- Filter valve `mcp_base_url` defaults to `http://burgermockup-mcp:8100` (compose);
+  use `http://host.docker.internal:8101` for a bare-metal server.
+
 ### Docker Compose (Recommended)
 ```bash
 cd src/open-webui

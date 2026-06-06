@@ -9,8 +9,10 @@ Invariants enforced in this layer (not trusted to the LLM):
 - n clamped to MAX_VARIANTS; negative constraints injected server-side
 - abort set checked between variants (host-controlled job abort)
 - one variant's failure never kills the batch
-- compact results: URLs/metrics go to the UI via progress notifications,
-  not into the LLM's context
+- compact results: detailed metrics go to the UI via progress notifications;
+  ready variants also carry their image url in the result, because host MCP
+  clients (e.g. Open WebUI) drop progress notifications and the result is the
+  only channel that reliably reaches the model
 """
 
 from __future__ import annotations
@@ -123,6 +125,7 @@ async def _run_batch(
             )
             results.append(VariantResult(variant_id=vid, scene_id=scene_id,
                                          status="ready", ssim=r["ssim"],
+                                         url=file_store.url_for(r["file_id"]),
                                          degraded=r.get("degraded", False)))
         except GateFailure as e:
             # GateFailure messages carry the failing score vs threshold.
@@ -152,7 +155,9 @@ async def generate_mockups(
     scene_specs: list[dict], n: int, ctx: Context,
 ) -> dict:
     """Generate n mockup variants of a registered design on a catalog product.
-    Streams per-variant progress; the design itself is never altered by AI."""
+    Streams per-variant progress; the design itself is never altered by AI.
+    Each ready variant includes a `url`; display it to the user as a markdown
+    image: ![variant](url)."""
     _log.info("generate_mockups job=%s design=%s product=%s n=%s specs=%d",
               job_id, design_id, product_id, n, len(scene_specs or []))
     if not file_store.resolve(design_id):
@@ -185,7 +190,8 @@ async def refine_mockups(
     """Refine existing variants. delta.type: design (reuse scenes, no image-model
     call) | scene (regenerate scenes) | product (new garment). target_ordinal
     (1-based) limits the refine to one variant. delta.scale (0.3–1.6) resizes
-    the printed design (1.0 = unchanged)."""
+    the printed design (1.0 = unchanged). Each ready variant includes a `url`;
+    display it to the user as a markdown image: ![variant](url)."""
     _log.info("refine_mockups job=%s design=%s product=%s delta=%s variants=%d",
               job_id, design_id, product_id, delta.get("type"), len(variants or []))
     if delta.get("type") not in ("design", "scene", "product"):

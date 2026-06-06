@@ -114,6 +114,30 @@ async def test_design_meta_persisted_and_threaded():
         assert meta["text_heavy"] == reg.data["text_heavy"]  # one source of truth
 
 
+async def test_background_stays_white_where_base_was_transparent():
+    # Catalog bases hide dark RGB under near-zero alpha (matting remnants).
+    # The render must flatten them over white — alpha-dropping conversions
+    # exposed them as gray blotches around the garment.
+    import numpy as np
+
+    from server.catalog.store import base_image_path
+
+    async with Client(mcp) as client:
+        variant, events = await _generate_one(client)
+        assert variant["status"] == "ready"
+        ready = [e for e in events if e["event"] == "variant_ready"][0]
+        out = np.asarray(
+            Image.open(file_store.resolve(ready["url"].rsplit("/", 1)[-1])).convert("RGB"),
+            dtype=np.float32)
+
+        base = Image.open(base_image_path("USG5000")).convert("RGBA")
+        alpha = np.asarray(
+            base.split()[-1].resize((out.shape[1], out.shape[0]), Image.BILINEAR),
+            dtype=np.float32) / 255.0
+        luma = out.mean(axis=2)
+        assert luma[alpha < 0.1].min() >= 240  # ghost pixels were luma 114-185
+
+
 async def test_flat_render_is_deterministic_and_fast():
     async with Client(mcp) as client:
         v1, e1 = await _generate_one(client)

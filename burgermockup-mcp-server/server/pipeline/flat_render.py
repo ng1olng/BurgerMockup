@@ -31,6 +31,23 @@ def _load_rgba(path: str) -> np.ndarray:
     return np.array(Image.open(path).convert("RGBA"))
 
 
+def flatten_over_white(rgba: np.ndarray) -> np.ndarray:
+    """White-composite an RGBA image and return it fully opaque (same shape).
+
+    Catalog bases carry dark RGB values hidden under near-zero alpha (matting
+    remnants from the source photos). Any naive alpha-dropping conversion
+    (cv2 RGBA2RGB, PIL convert("RGB")) exposes them as gray blotches, so the
+    base is flattened over white ONCE at load — downstream upscale, shading,
+    scene-model input, and save then operate on clean opaque pixels. Designs
+    must NOT pass through this: their alpha drives compositing."""
+    a = rgba[:, :, 3:4].astype(np.float32) / 255.0
+    out = rgba.copy()
+    out[:, :, :3] = (rgba[:, :, :3].astype(np.float32) * a
+                     + 255.0 * (1.0 - a)).astype(np.uint8)
+    out[:, :, 3] = 255
+    return out
+
+
 def render_flat(design_path: str, base_path: str,
                 quad: list[tuple[float, float]], *,
                 text_heavy: bool = False, prompt: str = "",
@@ -39,7 +56,7 @@ def render_flat(design_path: str, base_path: str,
     integrity cannot be preserved. Deterministic, CPU-only, no paid calls."""
     t0 = time.time()
     design = _load_rgba(design_path)
-    base = _load_rgba(base_path)
+    base = flatten_over_white(_load_rgba(base_path))
     up_base, up_quad = upscale_base(base, quad)
 
     threshold = threshold_for("flat", text_heavy)

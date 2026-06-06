@@ -9,6 +9,7 @@ import base64
 import io
 import json
 import os
+import re
 
 import pytest
 from fastmcp import Client
@@ -99,6 +100,16 @@ async def test_generate_clamps_n_and_isolates_failures():
         assert len(variants) == 8  # MAX_VARIANTS clamp, not 9999
         statuses = {v["status"] for v in variants}
         assert statuses == {"ready", "failed"}  # __fail__ spec isolated, batch survived
+        # Ready variants carry a browser-fetchable url whose file_id resolves;
+        # failed variants carry none. Suffix-only match: PUBLIC_FILES_BASE may
+        # vary per environment.
+        for v in variants:
+            if v["status"] == "ready":
+                m = re.search(r"/files/([0-9a-f-]{36})\.png$", v["url"])
+                assert m, v["url"]
+                assert file_store.resolve(m.group(1)) is not None
+            else:
+                assert v["url"] is None
         ready = [e for e in events if e["event"] == "variant_ready"]
         failed = [e for e in events if e["event"] == "variant_failed"]
         assert len(ready) + len(failed) == 8

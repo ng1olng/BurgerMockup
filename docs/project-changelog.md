@@ -2,6 +2,9 @@
 
 ## [2026-06-06] MCP Server Migration & OpenWebUI Integration
 
+### Features
+- **Mockup image URLs in MCP tool result** — Ready variants in `generate_mockups` and `refine_mockups` final tool results now include browser-fetchable `url` field; LLM renders as inline markdown images in OpenWebUI chat
+
 ### Added
 - **burgermockup-mcp-server** migrated to repo root (`./burgermockup-mcp-server/`)
   - 5 MCP tools: `match_product`, `generate_mockups`, `refine_mockups`, `register_design`, `export_listing` (stub)

@@ -103,13 +103,18 @@ class VariantRef(BaseModel):
 
 
 class VariantResult(BaseModel):
-    """Compact tool result per variant. URLs and detailed metrics travel via
-    progress notifications to the UI, NOT through the LLM's context."""
+    """Compact tool result per variant. Detailed metrics travel via progress
+    notifications to the UI; ready variants also carry their image `url` here
+    because host MCP clients (e.g. Open WebUI) drop progress notifications, so
+    the tool result is the only channel that reliably reaches the model."""
 
     variant_id: str
     scene_id: str
     status: str  # ready | failed
     ssim: Optional[float] = None
+    # Browser-fetchable image URL (PUBLIC_FILES_BASE + /files/{id}.png);
+    # None for failed variants.
+    url: Optional[str] = None
     # True when a scene was requested but the variant fell back to the flat
     # path (scene model failing) — consumers must be able to disclose this.
     degraded: bool = False

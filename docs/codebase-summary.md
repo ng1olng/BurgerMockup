@@ -43,6 +43,7 @@
 - Native MCP via streamable HTTP: `http://host.docker.internal:8100/mcp` from Docker
 - Tool IDs: `server:mcp:burgermockup`
 - No progress UI surfacing (MCP notifications ignored by OpenWebUI v0.9.6; final result only)
+- Ready variants carry `url` field in final tool result; LLM renders as `![variant](url)` markdown in chat (bare-metal local; browser must reach `PUBLIC_FILES_BASE` + `/files/{id}.png`)
 
 ---
 
