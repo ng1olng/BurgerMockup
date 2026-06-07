@@ -74,6 +74,12 @@ class SceneSpec(BaseModel):
     lighting: str = ""
     mood: str = ""
     market: str = ""
+    # Richer prompt vocabulary — lets the calling LLM produce more differentiated
+    # scenes per batch without changing the server's rendering pipeline.
+    camera: str = ""        # e.g. "Canon EOS R5, 85mm, f/1.8, shallow DOF"
+    composition: str = ""   # e.g. "rule of thirds, medium shot, slight high angle"
+    style: str = ""         # e.g. "editorial lifestyle, cinematic, flat-lay"
+    film_look: str = ""     # e.g. "warm film grain, matte finish, lifted shadows"
 
     def with_constraints(self) -> dict:
         """Serialize with the system-side negative constraints attached."""

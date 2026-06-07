@@ -544,6 +544,163 @@ environment:
 
 ---
 
+## BurgerMockup MCP Server
+
+The MCP server (`burgermockup-mcp-server/`) handles AI mockup generation. It runs independently from Open WebUI and exposes:
+- **MCP tools** over streamable HTTP at `:8100/mcp` (for OWUI MCP integration)
+- **OpenAI-compatible image endpoint** at `:8100/v1/images/generations` (for OWUI image generation)
+
+### Prerequisites
+
+- Python 3.12+
+- A **billed** Google Gemini API key (`gemini-2.5-flash-image` requires billing; free tier has 0 quota)
+
+### Local Run
+
+```bash
+cd burgermockup-mcp-server
+
+# Create venv and install dependencies
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env — set GEMINI_API_KEY at minimum
+```
+
+Minimal `.env` for local development:
+```bash
+MCP_BIND_HOST=127.0.0.1
+MCP_PORT=8100
+PUBLIC_FILES_BASE=http://127.0.0.1:8100
+LOG_LEVEL=INFO
+FILES_DIR=files
+GEMINI_API_KEY=your-gemini-api-key-here
+```
+
+```bash
+# Start the server
+python -m server.main
+# → Listening on http://127.0.0.1:8100
+# → Health: curl http://127.0.0.1:8100/health
+```
+
+### Environment Variables Reference
+
+| Variable | Default | Required | Purpose |
+|----------|---------|----------|---------|
+| `GEMINI_API_KEY` | (empty) | **Yes** (for scene gen) | Gemini API key — must be on a **billed** account; free-tier quota is 0 for image generation |
+| `MCP_BIND_HOST` | `127.0.0.1` | — | Bind address — never change to `0.0.0.0` (no auth on this server) |
+| `MCP_PORT` | `8100` | — | HTTP port |
+| `PUBLIC_FILES_BASE` | `http://127.0.0.1:8100` | — | Base URL for generated image links returned to OWUI — must be browser-reachable |
+| `FILES_DIR` | `files` | — | Directory for storing generated PNG files (relative to server root) |
+| `LOG_LEVEL` | `INFO` | — | `DEBUG` shows gate scores and scene-cache hits/misses |
+| `BP_API_KEY` | (empty) | — | BurgerPrints API key — only needed for catalog re-crawl; not needed at runtime |
+
+> **`PUBLIC_FILES_BASE`** is the most common misconfiguration. The URL in this variable ends up in the `url` field of every generated mockup returned to OWUI. If OWUI runs in Docker and the MCP server runs on the host, set `PUBLIC_FILES_BASE=http://host.docker.internal:8100`.
+
+### Run Tests
+
+```bash
+cd burgermockup-mcp-server
+python -m pytest --ignore=tests/live_check.py --ignore=tests/live_gemini_ladder.py \
+  --ignore=tests/spike_client.py --ignore=tests/spike_server.py -q
+# Expected: 29 passed
+```
+
+Live tests (require real `GEMINI_API_KEY` with billing enabled):
+```bash
+# Generate 3 Christmas scenes from an existing mockup (costs ~$0.12)
+python -m tests.live_scene_gen
+```
+
+---
+
+## OWUI + MCP Server Integration
+
+### Option A — Image Generation (Recommended for prompt-enriched scene gen)
+
+Adds the MCP server as OWUI's image generation backend. Users type a simple prompt in chat; OWUI enriches it with an LLM, then sends it to the MCP server which calls Gemini and returns the image inline.
+
+**OWUI environment variables:**
+
+```bash
+# Enable image generation
+ENABLE_IMAGE_GENERATION=true
+IMAGE_GENERATION_ENGINE=openai
+
+# Point to the MCP server's OpenAI-compatible endpoint
+# Local (both on same machine):
+IMAGES_OPENAI_API_BASE_URL=http://127.0.0.1:8100/v1
+# Docker (OWUI in container, MCP server on host):
+# IMAGES_OPENAI_API_BASE_URL=http://host.docker.internal:8100/v1
+
+IMAGES_OPENAI_API_KEY=placeholder   # any non-empty string; server has no auth
+```
+
+In **Admin Panel → Settings → Images**, you can verify the connection with "Verify Connection".
+
+**Optional: customize the prompt enrichment template**
+
+OWUI automatically enriches short prompts before sending to the image backend. Customize via:
+
+Admin Panel → Settings → Tasks → "Image Prompt Generation Prompt Template":
+
+```
+### Task:
+Expand the user's image description into a highly detailed, photorealistic prompt.
+
+### Rules:
+- Specify age (18–28), hair color, skin tone
+- Specify clothing material, fit, color in detail
+- Add environment: setting, lighting, time of day, weather
+- Add pose, expression, camera angle (85mm, rule of thirds)
+- End with quality tags: photorealistic, 8K, professional photography, soft bokeh
+
+### Output:
+Strictly return JSON: { "prompt": "..." }
+
+### User request:
+{{MESSAGES:END:1}}
+```
+
+Or set via env var: `IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE="..."`
+
+### Option B — MCP Tools (for design-on-garment mockup workflow)
+
+Connects OWUI to the full mockup pipeline (design upload → garment selection → lifestyle scene).
+
+In OWUI Admin Panel → Settings → Tools → Add MCP Server:
+- **URL**: `http://127.0.0.1:8100/mcp` (local) or `http://host.docker.internal:8100/mcp` (Docker)
+- **Type**: Streamable HTTP
+
+Available MCP tools after connection:
+- `match_product` — Resolve product name to catalog ID
+- `register_design` — Upload a design image
+- `generate_mockups` — Generate lifestyle mockup variants
+- `refine_mockups` — Adjust existing mockups (scale, scene, product swap)
+
+### Local Full-Stack Development Setup
+
+Run all three services concurrently:
+
+```bash
+# Terminal 1 — MCP server
+cd burgermockup-mcp-server && python -m server.main
+
+# Terminal 2 — OWUI backend
+cd src/open-webui/backend && ./dev.sh          # port 8080
+
+# Terminal 3 — OWUI frontend
+cd src/open-webui && npm run dev               # port 5173
+```
+
+Open http://localhost:5173 — first account becomes admin.
+
+---
+
 ## Hosting on Railway
 
 Deploy the vendored copy (`src/open-webui/`) to [Railway](https://railway.com) as a single container service. Strategy: Railway builds the Dockerfile directly with `USE_SLIM=true`, SQLite persisted on a Railway volume, LLM served by an external API (no GPU on Railway — bundled Ollama not viable).

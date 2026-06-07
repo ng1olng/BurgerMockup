@@ -40,6 +40,7 @@ from server.storage import file_store
 from server.tools.catalog_tools import match_product
 from server.tools.design_tools import register_design
 from server.tools.export_tools import export_listing
+from server.tools.image_gen_compat import handle_image_generations
 from server.tools.mockup_tools import generate_mockups, refine_mockups
 
 mcp = FastMCP(
@@ -78,6 +79,27 @@ mcp = FastMCP(
         ")\n"
         "# → display each variant url as ![variant](url)\n"
         "```\n\n"
+        "## scene_specs — generating diverse variants\n\n"
+        "Each element in `scene_specs` is a `SceneSpec` object with these optional fields:\n"
+        "`niche`, `setting`, `model_persona`, `lighting`, `mood`, `market`,\n"
+        "`camera`, `composition`, `style`, `film_look`.\n\n"
+        "Built-in niches (use as `niche` value): cafe, streetwear, yoga, cozy, picnic, "
+        "flat-lay, christmas, christmas-outdoor, christmas-gifting.\n\n"
+        "**For a 3-scene Christmas batch** (e.g. user says '3 scene mùa lễ'), pass three "
+        "distinct specs — one per sub-variant — to get meaningfully different backgrounds:\n\n"
+        "```\n"
+        "scene_specs=[\n"
+        "  {'niche': 'christmas'},\n"
+        "  {'niche': 'christmas-outdoor'},\n"
+        "  {'niche': 'christmas-gifting'},\n"
+        "]\n"
+        "```\n\n"
+        "You may also add `camera`, `composition`, `style`, or `film_look` to any spec "
+        "for cinematic quality when the user asks for editorial/premium output:\n\n"
+        "```\n"
+        "{'niche': 'christmas', 'style': 'editorial lifestyle',\n"
+        " 'camera': 'Canon EOS R5, 85mm, f/1.8', 'film_look': 'warm film grain'}\n"
+        "```\n\n"
         "## Rules\n"
         "- Never call generate_mockups without a registered design_id.\n"
         "- Never fabricate product_id; always call match_product first.\n"
@@ -97,6 +119,18 @@ mcp.tool(match_product)
 mcp.tool(generate_mockups)
 mcp.tool(refine_mockups)
 mcp.tool(export_listing)
+
+
+@mcp.custom_route("/v1/images/generations", methods=["POST"])
+async def openai_image_generations(request: Request) -> JSONResponse:
+    """OpenAI-compatible image generation endpoint for OWUI / any OpenAI client.
+
+    Configure OWUI: IMAGE_GENERATION_ENGINE=openai,
+    IMAGES_OPENAI_API_BASE_URL=http://127.0.0.1:8100/v1
+    """
+    body = await request.json()
+    result, status_code = await handle_image_generations(body)
+    return JSONResponse(result, status_code=status_code)
 
 
 @mcp.custom_route("/designs", methods=["POST"])

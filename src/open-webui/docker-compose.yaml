@@ -23,6 +23,10 @@ services:
     environment:
       - 'OLLAMA_BASE_URL=http://ollama:11434'
       - 'WEBUI_SECRET_KEY='
+      - 'ENABLE_IMAGE_GENERATION=true'
+      - 'IMAGE_GENERATION_ENGINE=openai'
+      - 'IMAGES_OPENAI_API_BASE_URL=http://host.docker.internal:8100/v1'
+      - 'IMAGES_OPENAI_API_KEY=placeholder'
     extra_hosts:
       - host.docker.internal:host-gateway
     restart: unless-stopped

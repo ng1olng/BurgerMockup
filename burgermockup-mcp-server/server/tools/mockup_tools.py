@@ -188,10 +188,11 @@ async def refine_mockups(
     variants: list[dict], delta: dict, ctx: Context,
 ) -> dict:
     """Refine existing variants. delta.type: design (reuse scenes, no image-model
-    call) | scene (regenerate scenes) | product (new garment). target_ordinal
-    (1-based) limits the refine to one variant. delta.scale (0.3–1.6) resizes
-    the printed design (1.0 = unchanged). Each ready variant includes a `url`;
-    display it to the user as a markdown image: ![variant](url)."""
+    call) | scene (regenerate scenes) | product (new garment). delta.change:
+    niche name or free-form scene description for scene delta; omit for a fresh
+    default scene. target_ordinal (1-based) limits the refine to one variant.
+    delta.scale (0.3–1.6) resizes the printed design (1.0 = unchanged). Each
+    ready variant includes a `url`; display it as a markdown image: ![v](url)."""
     _log.info("refine_mockups job=%s design=%s product=%s delta=%s variants=%d",
               job_id, design_id, product_id, delta.get("type"), len(variants or []))
     if delta.get("type") not in ("design", "scene", "product"):
@@ -217,8 +218,11 @@ async def refine_mockups(
 
     # Design delta must not look like a scene request: spec stays empty so a
     # cache miss recomposites on the flat base instead of calling the model.
+    # Scene delta: put change in niche so wants_scene=True even when change is
+    # empty — empty change defaults to "cafe" so the lifestyle path runs.
+    change = delta.get("change") or ""
     spec = (SceneSpec().with_constraints() if delta["type"] == "design"
-            else SceneSpec(setting=delta.get("change", "")).with_constraints())
+            else SceneSpec(niche=change or "cafe").with_constraints())
     plans = [
         {"variant_id": v["variant_id"],
          # design delta reuses the existing scene; scene/product mint a new one
