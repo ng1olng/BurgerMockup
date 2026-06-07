@@ -7,6 +7,8 @@ with the swap.
 
 Invariants enforced in this layer (not trusted to the LLM):
 - n clamped to MAX_VARIANTS; negative constraints injected server-side
+- restricted scene text (named real people / real brands) rejected before
+  any image generation (content_gate)
 - abort set checked between variants (host-controlled job abort)
 - one variant's failure never kills the batch
 - compact results: detailed metrics go to the UI via progress notifications;
@@ -30,7 +32,7 @@ from PIL import Image
 from server import jobs
 from server.catalog import store
 from server.contracts import MAX_VARIANTS, SceneSpec, VariantResult, tool_error
-from server.pipeline import scene_cache, scene_gen
+from server.pipeline import content_gate, scene_cache, scene_gen
 from server.pipeline.flat_render import render_flat
 from server.pipeline.lifestyle_render import render_lifestyle
 from server.pipeline.on_model_render import render_on_model
@@ -220,7 +222,9 @@ async def generate_mockups(
     (VN or EN, e.g. "ngực trái" -> left-chest) to one of these values.
     Each ready variant includes a `url` (display it to the user as a markdown
     image: ![variant](url)) plus the `placement`/`design_scale` it was
-    rendered with — pass those back unchanged when refining that variant."""
+    rendered with — pass those back unchanged when refining that variant.
+    Real/famous people and real brands are rejected (restricted_content) —
+    use generic personas like "a young man", never celebrity names."""
     _log.info("generate_mockups job=%s design=%s product=%s n=%s specs=%d placement=%s",
               job_id, design_id, product_id, n, len(scene_specs or []), placement)
     if not file_store.resolve(design_id):
@@ -241,6 +245,19 @@ async def generate_mockups(
     specs = [SceneSpec(**{k: v for k, v in (s or {}).items()
                           if k in SceneSpec.model_fields}).with_constraints()
              for s in (scene_specs or [{}])]
+    # Server-side moderation, not trusted to the LLM: a persona/setting that
+    # names a real person or brand would override the prompt-level negative
+    # constraints (the prompt orders the model to draw them). Whole-call
+    # rejection — all variants share these specs, and rejecting here costs $0.
+    gate_texts = [t for s in specs
+                  for t in (s.get("niche"), s.get("setting"),
+                            s.get("model_persona"), s.get("mood")) if t]
+    if gate_texts and await content_gate.is_restricted(gate_texts):
+        _log.info("restricted_content rejected (generate) texts=%d", len(gate_texts))
+        return tool_error(
+            "restricted_content",
+            "scene references a real person or brand — describe a generic "
+            "persona/setting instead")
     # Flat batches (no scene anywhere) would render n identical images — the
     # quad is deterministic — so they walk the variety ladder instead. Scene
     # batches keep the requested placement: each variant already differs via
@@ -285,7 +302,9 @@ async def refine_mockups(
     These delta fields override the variant's echoed setting/model_persona;
     unset fields keep the variant's previous values. A scene delta with no
     change/setting/model_persona anywhere is rejected (empty_scene_delta) —
-    retry with the fields filled in."""
+    retry with the fields filled in.
+    Real/famous people and real brands are rejected (restricted_content) —
+    use generic personas like "a young man", never celebrity names."""
     _log.info("refine_mockups job=%s design=%s product=%s delta=%s variants=%d placement=%s",
               job_id, design_id, product_id, delta.get("type"), len(variants or []),
               placement)
@@ -326,6 +345,15 @@ async def refine_mockups(
     # drop echoed fields (delta.change kept as the legacy setting alias).
     d_setting = str(delta.get("setting") or delta.get("change") or "").strip()
     d_persona = str(delta.get("model_persona") or "").strip()
+    # Gate only the NEW text introduced by this delta; echoed variant fields
+    # already passed the gate when the variant was generated.
+    if (d_setting or d_persona) and await content_gate.is_restricted(
+            [d_setting, d_persona]):
+        _log.info("restricted_content rejected (refine)")
+        return tool_error(
+            "restricted_content",
+            "scene references a real person or brand — describe a generic "
+            "persona/setting instead")
     # A scene delta with nothing to say — no setting/persona/change on the
     # delta AND no echoed scene fields on any target — can only produce a
     # scene-less flat render presented as success (the previous scene is
