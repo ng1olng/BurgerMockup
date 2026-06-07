@@ -41,18 +41,16 @@ def is_planar(short_code: str) -> bool:
 
 
 def build_product(detail: dict) -> dict:
+    # The API exposes no print-area or garment-type data: print regions are
+    # computed from the base image at render time, and the type is derived
+    # from the name at catalog load (see catalog/store.py).
     data = detail["data"]
     return {
         "short_code": data["short_code"],
         "name": data["name"],
-        "type": "tshirt",
         "available_colors": [
             {"id": c["id"], "name": c["name"], "color_hex": c.get("color_hex", "#ffffff")}
             for c in data.get("available_colors", [])
-        ],
-        "print_areas": [
-            {"name": area, "quad": [], "mesh": None, "source": "api"}
-            for area in (data.get("print_area") or ["front"])
         ],
         "base_url": data.get("url", ""),
         "resolution_default": data.get("resolution_default", ""),

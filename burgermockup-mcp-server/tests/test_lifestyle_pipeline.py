@@ -1,7 +1,6 @@
 """Lifestyle path must-haves (scene model MOCKED — no paid calls in tests):
-cache hit makes zero model calls; ECC absorbs small scene drift; heavy
-distortion is rejected by the gate; no key → graceful flat fallback; abort
-stops the loop with no further model calls."""
+cache hit makes zero model calls; drifted scenes still render; no key →
+graceful flat fallback; abort stops the loop with no further model calls."""
 
 from __future__ import annotations
 
@@ -15,14 +14,17 @@ import pytest
 from fastmcp import Client
 from PIL import Image, ImageDraw
 
+from server.catalog.store import base_image_path
 from server.pipeline import lifestyle_render, metrics, scene_cache, scene_gen
+from server.pipeline.placement import compute_quad
 from server.storage import file_store
 from server.main import mcp
 
 pytestmark = pytest.mark.asyncio
 
-QUAD = [tuple(p) for p in
-        json.load(open("server/catalog/data/quads.json"))["USG5000"]["front"]]
+QUAD = compute_quad(
+    np.array(Image.open(base_image_path("USG5000")).convert("RGBA")),
+    "tshirt", "center")
 
 
 @pytest.fixture(autouse=True)
@@ -67,14 +69,14 @@ async def _gen(client, n=1, niche="cafe", job="lj"):
     return res.data["variants"]
 
 
-async def test_lifestyle_with_small_drift_passes_ecc_gate(monkeypatch):
+async def test_lifestyle_with_small_drift_renders(monkeypatch):
     fake = FakeSceneGen(shift=(8, 5))
     monkeypatch.setattr(scene_gen, "available", lambda: True)
     monkeypatch.setattr(lifestyle_render.scene_gen, "generate_scene", fake)
     async with Client(mcp) as client:
         variants = await _gen(client)
         assert variants[0]["status"] == "ready", variants
-        assert variants[0]["ssim"] >= 0.87
+        assert variants[0]["url"]
         assert fake.calls == 1
         assert scene_cache.load_scene(variants[0]["scene_id"]) is not None
 
@@ -106,20 +108,19 @@ async def test_cached_scene_makes_zero_model_calls(monkeypatch):
         assert rows[-1]["cost_usd"] == 0.0 and rows[-1]["model"] == "scene-cache"
 
 
-async def test_corrupting_composite_rejected_on_lifestyle_path(monkeypatch):
-    # The gate guards DESIGN fidelity (a weird background alone cannot fail it —
-    # the design is placed by our own transform). Simulate a composite that
-    # corrupts the design: every gate pass scores below the lifestyle
-    # threshold → the variant must fail, nothing sub-threshold ships.
+async def test_heavy_scene_drift_still_ships(monkeypatch):
+    # Integrity gating was removed: even a heavily drifted scene renders and
+    # ships — the user judges results visually instead of getting an error.
+    # (The design itself is still placed by our own transform, never by AI.)
     monkeypatch.setattr(scene_gen, "available", lambda: True)
     monkeypatch.setattr(lifestyle_render.scene_gen, "generate_scene",
-                        FakeSceneGen(shift=(0, 0)))
-    monkeypatch.setattr(lifestyle_render, "score", lambda *a, **k: 0.52)
+                        FakeSceneGen(shift=(120, 90)))
     async with Client(mcp) as client:
         variants = await _gen(client, job="ldist")
-        assert variants[0]["status"] == "failed"  # gate refused; nothing shipped
+        assert variants[0]["status"] == "ready"  # nothing is refused anymore
+        assert variants[0]["url"]
         rows = [json.loads(l) for l in open(metrics.METRICS_PATH)]
-        assert rows[-1]["ssim"] == 0.52  # fail row logged
+        assert rows[-1]["cost_usd"] == 0.039  # variant logged
 
 
 async def test_design_refine_recomposite_is_deterministic(monkeypatch):
@@ -153,7 +154,7 @@ async def test_design_refine_recomposite_is_deterministic(monkeypatch):
     a, b = (open(file_store.resolve(u.rsplit("/", 1)[-1]), "rb").read() for u in urls)
     assert a == b  # identical scene pixels + identical composite
 
-    # delta.scale actually changes the printed size — and still passes the gate
+    # delta.scale actually changes the printed size — and still renders ready
     async with Client(mcp) as client:
         reg = await client.call_tool(
             "register_design", {"image_base64": _logo_b64(), "filename": "l.png"})

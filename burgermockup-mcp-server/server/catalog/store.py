@@ -1,10 +1,10 @@
-"""Catalog store: crawled catalog.json + annotated quads.json overlay +
-VN/EN fuzzy product matching for the match_product tool.
+"""Catalog store: crawled catalog.json + VN/EN fuzzy product matching for the
+match_product tool.
 
-quads.json exists because the public API exposes NO print-area coordinates —
-quads were derived from the placeholder graphic on the base images and are the
-required input for the compositor. A product without an annotated quad cannot
-be composited (tools return a structured error rather than guessing).
+The public BurgerPrints API exposes no print-area data; print regions are
+computed from the base image at render time (server/pipeline/placement). The
+garment type drives that placement's ratio table and is derived here from the
+product NAME, because the API has no type field either.
 """
 
 from __future__ import annotations
@@ -13,11 +13,10 @@ import json
 import os
 from typing import Optional
 
-from server.contracts import Color, Point, PrintArea, Product
+from server.contracts import Color, Product
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 CATALOG_JSON = os.path.join(DATA_DIR, "catalog.json")
-QUADS_JSON = os.path.join(DATA_DIR, "quads.json")
 BASES_DIR = os.path.join(DATA_DIR, "bases")
 
 # VN/EN garment vocabulary -> catalog token. Matching is intentionally simple:
@@ -31,30 +30,31 @@ _GARMENT_WORDS = {
     "áo nỉ": "sweatshirt",
 }
 
+# Ordered: specific garments before the t-shirt catch-all so "Crewneck
+# Sweatshirt" never resolves as tshirt.
+_NAME_TYPE_HINTS = (
+    ("hoodie", "hoodie"),
+    ("sweatshirt", "sweatshirt"),
+    ("crewneck", "sweatshirt"),
+    ("tank", "tank"),
+)
 
-def _quads() -> dict:
-    if not os.path.exists(QUADS_JSON):
-        return {}
-    with open(QUADS_JSON) as f:
-        return json.load(f)
+
+def _derive_type(name: str) -> str:
+    """Garment type from the product name (the API exposes no type field)."""
+    lowered = name.lower()
+    for hint, gtype in _NAME_TYPE_HINTS:
+        if hint in lowered:
+            return gtype
+    return "tshirt"
 
 
-def _to_product(d: dict, quads: dict) -> Product:
-    code_quads = quads.get(d["short_code"], {})
+def _to_product(d: dict) -> Product:
     return Product(
         short_code=d["short_code"],
         name=d["name"],
-        type=d.get("type", "tshirt"),
+        type=_derive_type(d["name"]),
         available_colors=[Color(**c) for c in d.get("available_colors", [])],
-        print_areas=[
-            PrintArea(
-                name=a["name"],
-                quad=[Point(x=p[0], y=p[1]) for p in code_quads.get(a["name"], [])],
-                mesh=a.get("mesh"),
-                source="annotated" if a["name"] in code_quads else "api",
-            )
-            for a in d.get("print_areas", [])
-        ],
         base_url=d.get("base_url", ""),
         resolution_default=d.get("resolution_default", ""),
     )
@@ -63,9 +63,8 @@ def _to_product(d: dict, quads: dict) -> Product:
 def load_catalog(path: str = CATALOG_JSON) -> list[Product]:
     if not os.path.exists(path):
         return []
-    quads = _quads()
     with open(path) as f:
-        return [_to_product(d, quads) for d in json.load(f)]
+        return [_to_product(d) for d in json.load(f)]
 
 
 def get_product(product_id: str) -> Optional[Product]:

@@ -31,17 +31,6 @@ class Point(BaseModel):
     y: float
 
 
-class PrintArea(BaseModel):
-    """One printable region. `quad` = 4 corners (TL,TR,BR,BL) in base-image
-    coordinates, loaded from the annotated quads.json (the public API exposes
-    no coordinates)."""
-
-    name: str
-    quad: list[Point] = Field(default_factory=list)
-    mesh: Optional[list[Point]] = None
-    source: str = "annotated"
-
-
 class Color(BaseModel):
     id: str
     name: str
@@ -49,11 +38,13 @@ class Color(BaseModel):
 
 
 class Product(BaseModel):
+    """Catalog product. The public API exposes no print-area data; the print
+    region is computed from the base image at render time (pipeline/placement)."""
+
     short_code: str
     name: str
     type: str = "tshirt"
     available_colors: list[Color] = Field(default_factory=list)
-    print_areas: list[PrintArea] = Field(default_factory=list)
     base_url: str = ""
     resolution_default: str = ""
 
@@ -96,10 +87,22 @@ class SceneAsset(BaseModel):
 
 
 class VariantRef(BaseModel):
-    """Compact variant reference passed between host and server (refine input)."""
+    """Compact variant reference passed between host and server (refine input).
+
+    `placement`/`design_scale` echo what generate_mockups returned for this
+    variant: flat batches vary them per variant (variety ladder), and the
+    server is stateless, so the host must round-trip them or a flat refine
+    would recompute the wrong quad. Empty/None falls back to the tool-level
+    placement param (pre-ladder hosts keep working)."""
 
     variant_id: str
     scene_id: str
+    placement: str = ""
+    design_scale: Optional[float] = None
+    # Echoed from ai-rendered (on-model) results; a refine of such a variant
+    # rebuilds the on-model prompt from these instead of recompositing.
+    setting: Optional[str] = None
+    model_persona: Optional[str] = None
 
 
 class VariantResult(BaseModel):
@@ -111,18 +114,37 @@ class VariantResult(BaseModel):
     variant_id: str
     scene_id: str
     status: str  # ready | failed
-    ssim: Optional[float] = None
     # Browser-fetchable image URL (PUBLIC_FILES_BASE + /files/{id}.png);
     # None for failed variants.
     url: Optional[str] = None
     # True when a scene was requested but the variant fell back to the flat
     # path (scene model failing) — consumers must be able to disclose this.
     degraded: bool = False
+    # The (placement, design_scale) this variant was rendered with. Flat
+    # batches vary these per variant (variety ladder); hosts must pass them
+    # back on refine so the variant reproduces its own quad.
+    placement: str = ""
+    design_scale: float = 1.0
+    # "exact": design composited by CV, pixel-true (flat/lifestyle paths).
+    # "ai-rendered": design passed through the image model once (on-model
+    # path) — near-exact, not print-exact; consumers must disclose this.
+    design_fidelity: str = "exact"
+    # On-model variants echo the prompt inputs (stateless server: a refine
+    # must rebuild the on-model prompt from what the host passes back).
+    # None on exact variants.
+    setting: Optional[str] = None
+    model_persona: Optional[str] = None
 
 
 class RefineDelta(BaseModel):
     type: str  # design | scene | product
     change: str = ""
+    # Scene-delta overrides (additive). They set/replace WHERE (setting) and
+    # WHO (model_persona) directly on the delta, so persona/setting changes do
+    # not depend on the host echoing the variant's fields back intact — weak
+    # host models drop echoed fields, which silently produced a flat render.
+    setting: str = ""
+    model_persona: str = ""
     target_ordinal: Optional[int] = None  # 1-based; None = all variants
 
 
@@ -130,7 +152,6 @@ class MetricsRow(BaseModel):
     mockup_id: str
     prompt: str
     model: str
-    ssim: float
     latency_ms: int
     cost_usd: float
     timestamp: str

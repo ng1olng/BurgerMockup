@@ -22,21 +22,22 @@
 
 **Key Constraints**:
 - Versions pinned: `fastmcp==3.4.1`, `mcp==1.27.2` (never bump; fastmcp #1305 breaks abort semantics)
-- SSIM gate enforced server-side: ≥0.92 flat, ≥0.85 lifestyle (internal margin ≥0.93/0.87)
-- Design pixels never pass through image model (warped + masked in design space, scored with CV)
+- Design pixels never pass through image model (warped + masked in design space by own homography)
+- No integrity gating: every composite ships; users judge results visually in chat
 - No auth required (local 127.0.0.1 only; job_id minting + variant caps provide credit guardrails)
 
 **5 MCP Tools** (`server/tools/`):
-1. **match_product** — Query BurgerPrints catalog by design description; return product + print-quad metadata
-2. **generate_mockups** — Full pipeline: scene generation (Gemini), compositing, SSIM verification, retry on fail
-3. **refine_mockups** — Design-only refine (scale, rotate) within a session; zero image-model calls; reuse cached scene
-4. **register_design** — Persist design metadata (hash, print-area) for catalog indexing
+1. **match_product** — Query BurgerPrints catalog by design description; return product metadata (print quads computed from base alpha at render time)
+2. **generate_mockups** — Full pipeline: scene generation (Gemini), compositing, save + return URL. `n` defaults to 1 (n>1 only on explicit user ask); flat batches (no scene) walk a deterministic placement+scale variety ladder (`placement_ladder` in `pipeline/placement.py`) so variants differ; scene batches keep the requested placement (scenes already differ)
+3. **refine_mockups** — Design-only refine (scale, rotate) within a session; zero image-model calls; reuse cached scene. Returns ONE image by default (docstring steers `target_ordinal` to most recent variant); accepts per-variant `placement`/`design_scale` (echoed by generate results) with fallback to tool-level placement; explicit `delta.scale` overrides a variant's recorded scale
+4. **register_design** — Persist design metadata (hash, text-heavy flag) for catalog indexing
 5. **export_listing** — Stub for marketplace publish (TBD)
+
+**Variant contract**: `VariantResult` carries `placement` + `design_scale` per variant — server is stateless, hosts must round-trip them on refine so each variant reproduces its own quad.
 
 **Pipeline** (`server/cv/`):
 - Scene caching per design (byte-deterministic; reused across refines)
-- ECC-based quad detection + homography warping
-- Design masking + SSIM scoring (gaussian window, design-on-unwarped-base reference)
+- Homography warping into CV-computed print quad
 - Per-variant error isolation + fast-fail
 
 **OpenWebUI Integration**:

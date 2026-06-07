@@ -5,9 +5,8 @@ loads .env itself; the MCP server only needs a restart for the chat path).
 Ladder (each step gates the next; total cost ≈ $0.04):
   1. key present + client constructs
   2. one real scene generation (~$0.039) — proves billing/quota
-  3. quad validity: composite a design onto the generated scene and run the
-     un-skippable lifestyle SSIM gate (the open spike: does the edited scene
-     keep the print region usable?)
+  3. composite a design onto the generated scene and save the mockup
+     (inspect the file: does the edited scene keep the print region usable?)
 
 Usage: .venv/bin/python tests/live_gemini_ladder.py [design.png]
 Not a pytest module on purpose — it spends real money.
@@ -16,7 +15,6 @@ Not a pytest module on purpose — it spends real money.
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -30,7 +28,6 @@ load_dotenv(_ROOT / ".env")
 async def main() -> None:
     from server.catalog.store import base_image_path
     from server.pipeline import scene_gen
-    from server.pipeline.flat_render import GateFailure
     from server.pipeline.lifestyle_render import render_lifestyle
 
     # -- step 1: configuration
@@ -45,11 +42,16 @@ async def main() -> None:
         print(f"STEP 1 FAIL: design not found: {design}")
         sys.exit(1)
 
-    quad = [tuple(p) for p in json.load(
-        open("server/catalog/data/quads.json"))["USG5000"]["front"]]
+    import numpy as np
+    from PIL import Image
+
+    from server.pipeline.placement import compute_quad
+    quad = compute_quad(
+        np.array(Image.open(base_image_path("USG5000")).convert("RGBA")),
+        "tshirt", "center")
 
     # -- steps 2+3 in one call: render_lifestyle generates the scene (cost),
-    # caches it by scene_id, composites, and gates — exactly the chat path.
+    # caches it by scene_id, and composites — exactly the chat path.
     spec = {"niche": "christmas"}
     try:
         result = await render_lifestyle(
@@ -60,15 +62,11 @@ async def main() -> None:
         print(f"STEP 2 FAIL (scene generation): {e}")
         print("  → free-tier quota or auth problem; check billing on the key")
         sys.exit(1)
-    except GateFailure as e:
-        print(f"STEP 2 OK (scene generated, $ spent) but STEP 3 FAIL: {e}")
-        print("  → the edited scene drifted the print region past the gate; "
-              "inspect scene_cache/ output before spending more")
-        sys.exit(1)
 
     print(f"STEP 2 OK: scene generated (cost ${result['cost_usd']})")
-    print(f"STEP 3 OK: lifestyle gate passed, ssim {result['ssim']}")
+    print(f"STEP 3 OK: mockup composited and saved")
     print(f"  mockup file_id: {result['file_id']}")
+    print("  → inspect the file: the print region must look usable")
     print("LADDER PASS — restart the MCP server, then run a chat turn with "
           "n=1 (e.g. 'tạo 1 mockup scene giáng sinh').")
 

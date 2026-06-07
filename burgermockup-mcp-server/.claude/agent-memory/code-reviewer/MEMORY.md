@@ -1,0 +1,1 @@
+- [Conformance test hermeticity](conformance-env-hermeticity.md) — why tests pin scene_gen.available to False, not just delenv

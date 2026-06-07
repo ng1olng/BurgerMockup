@@ -21,7 +21,6 @@ def match_product(query: str) -> dict:
             "type": p.type,
             "colors": [c.name for c in p.available_colors][:8],
             "score": score,
-            "composable": any(a.quad for a in p.print_areas),
         }
         for p, score in store.match(query)
     ]

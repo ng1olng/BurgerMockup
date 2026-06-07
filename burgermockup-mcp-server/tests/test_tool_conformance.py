@@ -16,6 +16,7 @@ from fastmcp import Client
 from PIL import Image
 
 from server import jobs
+from server.pipeline import scene_gen
 from server.storage import file_store
 from server.main import mcp
 
@@ -25,9 +26,12 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture(autouse=True)
 def _tmp_files_dir(tmp_path, monkeypatch):
     file_store.init(str(tmp_path))
-    # Hermetic: a developer's ambient GEMINI_API_KEY must not flip these tests
-    # onto the live lifestyle path — conformance asserts the flat behavior.
+    # Hermetic: conformance asserts the flat behavior, so the lifestyle path
+    # must be unavailable. delenv alone is not enough — scene_gen._api_key()
+    # reloads .env with override=True on every call, resurrecting the key —
+    # so available() itself is pinned to False.
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(scene_gen, "available", lambda: False)
     yield
 
 
@@ -80,7 +84,9 @@ async def test_match_product_vn():
         res = await client.call_tool("match_product", {"query": "áo thun trắng"})
         cands = res.data["candidates"]
         assert cands and cands[0]["product_id"] == "USG5000"
-        assert cands[0]["composable"] is True  # annotated quad present
+        # placement is computed from the base image, so no per-product
+        # "composable" flag exists anymore
+        assert "composable" not in cands[0]
 
 
 async def test_generate_clamps_n_and_isolates_failures():
@@ -127,11 +133,23 @@ async def test_generate_unknown_ids_structured_errors():
             "generate_mockups", {"job_id": "j", "design_id": design_id,
                                  "product_id": "NOPE", "scene_specs": [], "n": 1})
         assert res.data["error"]["code"] == "product_not_found"
-        # USG2200 has no annotated quad -> must refuse rather than guess
+        # USG2200 has no base image asset -> must refuse rather than guess
         res = await client.call_tool(
             "generate_mockups", {"job_id": "j", "design_id": design_id,
                                  "product_id": "USG2200", "scene_specs": [], "n": 1})
-        assert res.data["error"]["code"] == "no_print_area"
+        assert res.data["error"]["code"] == "no_base_image"
+        # placement is enum-validated at the tool boundary on both tools
+        res = await client.call_tool(
+            "generate_mockups", {"job_id": "j", "design_id": design_id,
+                                 "product_id": "USG5000", "scene_specs": [], "n": 1,
+                                 "placement": "shoulder"})
+        assert res.data["error"]["code"] == "invalid_placement"
+        res = await client.call_tool(
+            "refine_mockups", {"job_id": "j", "design_id": design_id,
+                               "product_id": "USG5000",
+                               "variants": [{"variant_id": "v", "scene_id": "s"}],
+                               "delta": {"type": "design"}, "placement": "shoulder"})
+        assert res.data["error"]["code"] == "invalid_placement"
 
 
 async def test_abort_stops_batch():
@@ -171,6 +189,99 @@ async def test_refine_ordinal_and_design_delta_keeps_scene():
             {"job_id": "r2", "design_id": design_id, "product_id": "USG5000",
              "variants": variants, "delta": {"type": "design", "target_ordinal": 9}})
         assert bad.data["error"]["code"] == "ordinal_out_of_range"
+
+
+async def test_generate_defaults_to_one_variant():
+    # n omitted -> exactly one image; n>1 is an explicit-ask-only path.
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        res = await client.call_tool(
+            "generate_mockups", {"job_id": "j-default", "design_id": design_id,
+                                 "product_id": "USG5000", "scene_specs": []})
+        variants = res.data["variants"]
+        assert len(variants) == 1
+        assert variants[0]["status"] == "ready"
+        assert variants[0]["placement"] == "center"
+        assert variants[0]["design_scale"] == 1.0
+
+
+async def test_flat_batch_walks_variety_ladder():
+    # No scene requested: the flat path is deterministic, so a batch must vary
+    # (placement, design_scale) per variant or all n images are identical.
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        res = await client.call_tool(
+            "generate_mockups", {"job_id": "j-ladder", "design_id": design_id,
+                                 "product_id": "USG5000", "scene_specs": [], "n": 5,
+                                 "placement": "chest"})
+        variants = res.data["variants"]
+        assert len(variants) == 5
+        combos = [(v["placement"], v["design_scale"]) for v in variants]
+        assert combos[0] == ("chest", 1.0)  # variant 1 = exact request
+        assert len(set(combos)) == 5       # all distinct
+
+
+async def test_scene_spec_batch_keeps_requested_placement():
+    # Scene batches differ via their generated scenes — the ladder must NOT
+    # override the asked-for placement. No GEMINI_API_KEY here, so variants
+    # degrade to flat and the batch stays at the requested placement (the
+    # accepted near-identical-on-outage edge case, flagged degraded).
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        res = await client.call_tool(
+            "generate_mockups", {"job_id": "j-scene", "design_id": design_id,
+                                 "product_id": "USG5000",
+                                 "scene_specs": [{"niche": "cafe"}], "n": 3})
+        variants = res.data["variants"]
+        assert len(variants) == 3
+        assert all(v["placement"] == "center" for v in variants)
+        assert all(v["design_scale"] == 1.0 for v in variants)
+        assert all(v["degraded"] for v in variants)
+
+
+async def test_refine_per_variant_placement_roundtrip():
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        gen = await client.call_tool(
+            "generate_mockups", {"job_id": "g-rt", "design_id": design_id,
+                                 "product_id": "USG5000", "scene_specs": [], "n": 3})
+        variants = gen.data["variants"]
+        assert variants[1]["placement"] != variants[0]["placement"]  # ladder applied
+        # Refining variant 2 with its own returned fields reproduces ITS
+        # placement/scale — not the tool-level default.
+        ref = await client.call_tool(
+            "refine_mockups",
+            {"job_id": "r-rt", "design_id": design_id, "product_id": "USG5000",
+             "variants": variants,
+             "delta": {"type": "design", "target_ordinal": 2}})
+        out = ref.data["variants"]
+        assert len(out) == 1
+        assert out[0]["placement"] == variants[1]["placement"]
+        assert out[0]["design_scale"] == variants[1]["design_scale"]
+        # delta.scale wins over the variant's recorded scale.
+        ref2 = await client.call_tool(
+            "refine_mockups",
+            {"job_id": "r-rt2", "design_id": design_id, "product_id": "USG5000",
+             "variants": variants,
+             "delta": {"type": "design", "target_ordinal": 2, "scale": 0.5}})
+        assert ref2.data["variants"][0]["design_scale"] == 0.5
+        # Pre-ladder hosts (no per-variant fields) fall back to the tool-level
+        # placement param — today's behavior, no regression.
+        ref3 = await client.call_tool(
+            "refine_mockups",
+            {"job_id": "r-rt3", "design_id": design_id, "product_id": "USG5000",
+             "variants": [{"variant_id": variants[1]["variant_id"],
+                           "scene_id": variants[1]["scene_id"]}],
+             "delta": {"type": "design"}, "placement": "top"})
+        assert ref3.data["variants"][0]["placement"] == "top"
+        # Per-variant placement is enum-validated like the tool-level one.
+        bad = await client.call_tool(
+            "refine_mockups",
+            {"job_id": "r-rt4", "design_id": design_id, "product_id": "USG5000",
+             "variants": [{"variant_id": "v", "scene_id": "s",
+                           "placement": "shoulder"}],
+             "delta": {"type": "design"}})
+        assert bad.data["error"]["code"] == "invalid_placement"
 
 
 async def test_no_env_leakage_in_results():
