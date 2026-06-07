@@ -16,7 +16,7 @@ from fastmcp import Client
 from PIL import Image
 
 from server import jobs
-from server.pipeline import scene_gen
+from server.pipeline import content_gate, scene_gen
 from server.storage import file_store
 from server.main import mcp
 
@@ -33,6 +33,22 @@ def _tmp_files_dir(tmp_path, monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(scene_gen, "available", lambda: False)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _gate_stub(monkeypatch):
+    """Stub the moderation gate (same .env-resurrection hazard as scene_gen:
+    content_gate would make LIVE classifier calls on any scene text). Default
+    verdict: allowed. Yields the recorded call list so tests can assert when
+    the gate fires; restricted-path tests re-patch with their own verdict."""
+    calls: list[list[str]] = []
+
+    async def _allow(texts):
+        calls.append(list(texts))
+        return False
+
+    monkeypatch.setattr(content_gate, "is_restricted", _allow)
+    yield calls
 
 
 def _png_b64(size=(64, 64), mode="RGBA") -> str:
@@ -296,6 +312,57 @@ async def test_no_env_leakage_in_results():
             assert "sk-super-secret-value" not in json.dumps(res.data)
     finally:
         del os.environ["FAKE_SECRET_FOR_TEST"]
+
+
+async def test_restricted_scene_text_rejected(monkeypatch):
+    # Gate verdict True -> both tools refuse BEFORE any rendering, with the
+    # fixed restricted_content error (recovery guidance for the host LLM).
+    async def _deny(texts):
+        return True
+
+    monkeypatch.setattr(content_gate, "is_restricted", _deny)
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        res = await client.call_tool(
+            "generate_mockups",
+            {"job_id": "j-celeb", "design_id": design_id, "product_id": "USG5000",
+             "scene_specs": [{"model_persona": "Messi"}], "n": 1})
+        assert res.data["error"]["code"] == "restricted_content"
+        # Refine gates the delta's NEW text the same way.
+        res = await client.call_tool(
+            "refine_mockups",
+            {"job_id": "r-celeb", "design_id": design_id, "product_id": "USG5000",
+             "variants": [{"variant_id": "v", "scene_id": "s"}],
+             "delta": {"type": "scene", "model_persona": "CR7"}})
+        assert res.data["error"]["code"] == "restricted_content"
+
+
+async def test_scene_text_reaches_gate_and_clean_passes(_gate_stub):
+    # Allowed verdict -> generation proceeds; the gate saw the persona text.
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        res = await client.call_tool(
+            "generate_mockups",
+            {"job_id": "j-clean", "design_id": design_id, "product_id": "USG5000",
+             "scene_specs": [{"niche": "cafe"}], "n": 1})
+        assert res.data["variants"][0]["status"] == "ready"
+        assert _gate_stub and "cafe" in _gate_stub[0]
+
+
+async def test_flat_call_never_invokes_gate(_gate_stub):
+    # No scene text -> zero gate calls (no added latency on the flat path).
+    async with Client(mcp) as client:
+        design_id = await _register(client)
+        res = await client.call_tool(
+            "generate_mockups", {"job_id": "j-flat", "design_id": design_id,
+                                 "product_id": "USG5000", "scene_specs": [], "n": 1})
+        assert res.data["variants"][0]["status"] == "ready"
+        ref = await client.call_tool(
+            "refine_mockups",
+            {"job_id": "r-flat", "design_id": design_id, "product_id": "USG5000",
+             "variants": res.data["variants"], "delta": {"type": "design"}})
+        assert ref.data["variants"][0]["status"] == "ready"
+        assert _gate_stub == []
 
 
 async def test_export_is_stub():
