@@ -33,6 +33,7 @@ from server.contracts import MAX_VARIANTS, SceneSpec, VariantResult, tool_error
 from server.pipeline import scene_cache, scene_gen
 from server.pipeline.flat_render import render_flat
 from server.pipeline.lifestyle_render import render_lifestyle
+from server.pipeline.on_model_render import render_on_model
 from server.pipeline.placement import PLACEMENTS, compute_quad, placement_ladder
 from server.pipeline.scene_gen import SceneGenError
 from server.storage import file_store
@@ -67,7 +68,32 @@ async def _render_variant(design_id: str, product_id: str, spec: dict, scene_id:
     # placement reproduce the same region. Cached scenes keep their stored quad.
     base_rgba = np.array(Image.open(base_path).convert("RGBA"))
     quad = compute_quad(base_rgba, product.type, placement)
-    label = spec.get("niche") or spec.get("setting") or "flat"
+    label = (spec.get("niche") or spec.get("setting")
+             or spec.get("model_persona") or "flat")
+
+    # On-model: a person must WEAR the garment, which the quad-locked scene
+    # path cannot do (the scene model is ordered to freeze the garment, so a
+    # persona prompt yields a second, untracked garment). Compose the design
+    # first, then re-render worn; design pixels pass through the model once.
+    wants_person = bool(spec.get("model_persona"))
+    if wants_person and scene_gen.available():
+        _log.info("path=on-model scene_id=%s label=%s", scene_id, label)
+        try:
+            r = await render_on_model(design_path, base_path, quad, spec,
+                                      prompt_label=label, mockup_id=scene_id,
+                                      design_scale=design_scale)
+            r["fidelity"] = "ai-rendered"
+            return r
+        except SceneGenError:
+            # Same degradation policy as lifestyle: a flat mockup beats an
+            # error wall — flagged in the result.
+            _log.warning("on-model generation failed; degrading to flat "
+                         "(scene_id=%s label=%s)", scene_id, label)
+        flat = await asyncio.to_thread(
+            render_flat, design_path, base_path, quad,
+            prompt=label, mockup_id=scene_id, design_scale=design_scale)
+        flat["degraded"] = True
+        return flat
 
     wants_scene = bool(spec.get("niche") or spec.get("setting"))
     has_cached_scene = scene_cache.load_scene(scene_id) is not None
@@ -91,8 +117,8 @@ async def _render_variant(design_id: str, product_id: str, spec: dict, scene_id:
     flat = await asyncio.to_thread(
         render_flat, design_path, base_path, quad,
         prompt=label, mockup_id=scene_id, design_scale=design_scale)
-    if wants_scene:
-        flat["degraded"] = True  # asked for a scene, delivered flat
+    if wants_scene or wants_person:
+        flat["degraded"] = True  # asked for a scene/person, delivered flat
     return flat
 
 
@@ -125,22 +151,31 @@ async def _run_batch(
             r = await _render_variant(design_id, product_id, spec, scene_id,
                                       design_scale=v_scale,
                                       placement=v_placement)
-            _log.info("variant %s ready latency=%dms cost=$%.3f degraded=%s",
+            fidelity = r.get("fidelity", "exact")
+            _log.info("variant %s ready latency=%dms cost=$%.3f degraded=%s "
+                      "fidelity=%s",
                       vid, int((time.time() - t0) * 1000),
-                      r["cost_usd"], r.get("degraded", False))
+                      r["cost_usd"], r.get("degraded", False), fidelity)
             await _report(
                 ctx, i, n, "variant_ready",
                 variant_id=vid, url=file_store.url_for(r["file_id"]),
                 latency_ms=int((time.time() - t0) * 1000),
                 cost_usd=r["cost_usd"], degraded=r.get("degraded", False),
                 placement=v_placement, design_scale=v_scale,
+                design_fidelity=fidelity,
             )
-            results.append(VariantResult(variant_id=vid, scene_id=scene_id,
-                                         status="ready",
-                                         url=file_store.url_for(r["file_id"]),
-                                         degraded=r.get("degraded", False),
-                                         placement=v_placement,
-                                         design_scale=v_scale))
+            results.append(VariantResult(
+                variant_id=vid, scene_id=scene_id, status="ready",
+                url=file_store.url_for(r["file_id"]),
+                degraded=r.get("degraded", False),
+                placement=v_placement, design_scale=v_scale,
+                design_fidelity=fidelity,
+                # Stateless echo: on-model refines rebuild the prompt from
+                # these (exact variants carry no prompt state to echo).
+                setting=(spec.get("setting") or None
+                         if fidelity == "ai-rendered" else None),
+                model_persona=(spec.get("model_persona") or None
+                               if fidelity == "ai-rendered" else None)))
         except SceneGenError as e:
             # SceneGenError messages are fixed strings by construction.
             _log.warning("variant %s scene generation failed: %s", vid, e)
@@ -170,10 +205,12 @@ async def generate_mockups(
     placement: str = "center",
 ) -> dict:
     """Generate mockup variants of a registered design on a catalog product.
-    If the user wants a person wearing the product, a model, or any
-    scene/location ("a man wearing it", "on the street", "in a café"), you
-    MUST pass scene_specs=[{"setting": "<that description>"}] — empty
-    scene_specs renders a flat product-only image.
+    If the user wants a person/model WEARING the product, you MUST pass
+    scene_specs=[{"setting": "<location>", "model_persona": "<short persona,
+    e.g. a young woman>"}] — the result is then ai-rendered (near-exact, not
+    print-exact; mention this). For a scene WITHOUT a person ("on a beach",
+    "in a café") pass only {"setting": ...}. Empty scene_specs renders a flat
+    product-only image.
     `n` defaults to 1 — pass n>1 ONLY when the user explicitly asks for a
     number of images ("give me 5 mockups" -> n=5). Batches without a scene
     automatically vary placement/scale per variant so the images differ.
@@ -238,7 +275,17 @@ async def refine_mockups(
     `design_scale` exactly as generate_mockups returned them (batch variants
     differ); to MOVE the design on a scene variant use delta.type=scene —
     a design delta keeps the cached scene's locked position. Each ready variant
-    includes a `url`; display it to the user as a markdown image: ![variant](url)."""
+    includes a `url`; display it to the user as a markdown image: ![variant](url).
+    Pass every variant back EXACTLY as returned — including design_fidelity,
+    setting and model_persona when present (on-model variants re-run fully;
+    their scene will differ between runs).
+    To change WHO wears the product ("đổi sang mẫu nam" / "change to a male
+    model") pass delta={"type": "scene", "model_persona": "a young man"}; to
+    change WHERE, pass delta={"type": "scene", "setting": "<location>"}.
+    These delta fields override the variant's echoed setting/model_persona;
+    unset fields keep the variant's previous values. A scene delta with no
+    change/setting/model_persona anywhere is rejected (empty_scene_delta) —
+    retry with the fields filled in."""
     _log.info("refine_mockups job=%s design=%s product=%s delta=%s variants=%d placement=%s",
               job_id, design_id, product_id, delta.get("type"), len(variants or []),
               placement)
@@ -274,10 +321,27 @@ async def refine_mockups(
                               f"target_ordinal must be between 1 and {len(variants)}")
         targets = [variants[ordinal - 1]]
 
+    # Delta-level overrides: setting/model_persona on the delta beat the
+    # variant's echoed fields, so persona/setting changes survive hosts that
+    # drop echoed fields (delta.change kept as the legacy setting alias).
+    d_setting = str(delta.get("setting") or delta.get("change") or "").strip()
+    d_persona = str(delta.get("model_persona") or "").strip()
+    # A scene delta with nothing to say — no setting/persona/change on the
+    # delta AND no echoed scene fields on any target — can only produce a
+    # scene-less flat render presented as success (the previous scene is
+    # silently lost). Reject it so the host retries with real fields.
+    if delta["type"] == "scene" and not (d_setting or d_persona) and not any(
+            v.get("setting") or v.get("model_persona") for v in targets):
+        return tool_error(
+            "empty_scene_delta",
+            "scene delta needs delta.setting / delta.model_persona / "
+            "delta.change, or variants passed back with their echoed "
+            "setting and model_persona fields")
+
     # Design delta must not look like a scene request: spec stays empty so a
     # cache miss recomposites on the flat base instead of calling the model.
     spec = (SceneSpec().with_constraints() if delta["type"] == "design"
-            else SceneSpec(setting=delta.get("change", "")).with_constraints())
+            else SceneSpec(setting=d_setting).with_constraints())
     plans = []
     for v in targets:
         # Batch variants carry their own placement/design_scale (variety
@@ -292,6 +356,21 @@ async def refine_mockups(
                        else min(max(float(v.get("design_scale") or 1.0), 0.3), 1.6))
         except (TypeError, ValueError):
             return tool_error("invalid_scale", "variant design_scale must be a number")
+        eff_persona = d_persona or v.get("model_persona") or ""
+        if eff_persona:
+            # On-model variant (echoed persona) or persona introduced by the
+            # delta: the design is baked into the image, no quad exists to
+            # recomposite — EVERY such refine is a full on-model re-run.
+            # Prompt rebuilt from delta overrides falling back to the echoed
+            # fields. Always a fresh scene_id (no cache).
+            v_spec = SceneSpec(
+                setting=d_setting or v.get("setting") or "",
+                model_persona=eff_persona).with_constraints()
+            plans.append(
+                {"variant_id": v["variant_id"], "scene_id": str(uuid.uuid4()),
+                 "spec": v_spec,
+                 "placement": v_placement, "design_scale": v_scale})
+            continue
         plans.append(
             {"variant_id": v["variant_id"],
              # design delta reuses the existing scene; scene/product mint a new one

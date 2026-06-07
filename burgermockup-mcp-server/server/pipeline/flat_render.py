@@ -41,21 +41,33 @@ def flatten_over_white(rgba: np.ndarray) -> np.ndarray:
     return out
 
 
+def compose_flat_image(design_path: str, base_path: str,
+                       quad: list[tuple[float, float]], *,
+                       design_scale: float = 1.0) -> np.ndarray:
+    """Design composited onto the upscaled flat base; returns the RGBA array.
+
+    Pure compute — no file_store/metrics side effects — so the flat path and
+    the on-model path (which sends this image to the scene model) share one
+    compositing implementation."""
+    design = _load_rgba(design_path)
+    base = flatten_over_white(_load_rgba(base_path))
+    up_base, up_quad = upscale_base(base, quad)
+    result = composite(design, up_base, up_quad,
+                       shading_strength=_SHADING_DEFAULT,
+                       design_scale=design_scale)
+    return result.image
+
+
 def render_flat(design_path: str, base_path: str,
                 quad: list[tuple[float, float]], *,
                 prompt: str = "", mockup_id: str = "",
                 design_scale: float = 1.0) -> dict:
     """Returns {file_id, cost_usd}. Deterministic, CPU-only, no paid calls."""
     t0 = time.time()
-    design = _load_rgba(design_path)
-    base = flatten_over_white(_load_rgba(base_path))
-    up_base, up_quad = upscale_base(base, quad)
-
-    result = composite(design, up_base, up_quad,
-                       shading_strength=_SHADING_DEFAULT,
-                       design_scale=design_scale)
+    image = compose_flat_image(design_path, base_path, quad,
+                               design_scale=design_scale)
     file_id, _ = file_store.save_image(
-        Image.fromarray(cv2.cvtColor(result.image, cv2.COLOR_RGBA2RGB)))
+        Image.fromarray(cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)))
     metrics.log_variant(mockup_id or file_id, prompt, "flat-cv",
                         int((time.time() - t0) * 1000), 0.0)
     return {"file_id": file_id, "cost_usd": 0.0}

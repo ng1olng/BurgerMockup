@@ -13,14 +13,23 @@ services:
       # Loopback only — the server has no auth. Published so the host browser
       # can fetch /files/{id} links returned by the tools.
       - 127.0.0.1:8100:8100
+    # Single source of truth: the server's .env (GEMINI_API_KEY, BP_API_KEY,
+    # LOG_LEVEL, ...). Env is injected at container creation, not image build —
+    # after editing .env, a plain `up -d` recreates the container; no --build.
+    env_file:
+      - path: ../../burgermockup-mcp-server/.env
+        required: false # fresh clones without .env still boot
     environment:
+      # Container-safe pins — `environment` wins over `env_file`. The .env is
+      # host-oriented: MCP_BIND_HOST=127.0.0.1 is unreachable from other
+      # containers and its relative FILES_DIR would dodge the volume. New
+      # host-only vars added to .env need a matching pin here.
+      - MCP_BIND_HOST=0.0.0.0
+      - FILES_DIR=/data/files
+      - METRICS_PATH=/data/metrics/metrics.jsonl
       # File links render in the host browser, so the public base is the
       # host-published address, not the compose-internal one.
       - PUBLIC_FILES_BASE=http://127.0.0.1:8100
-      - GEMINI_API_KEY=${GEMINI_API_KEY-}
-      # Intentionally no env_file: the server's .env sets MCP_BIND_HOST=127.0.0.1
-      # (unreachable from other containers) and a relative FILES_DIR (dodges the
-      # volume). The Dockerfile's container-safe ENV values must win.
     volumes:
       - burgermockup-files:/data/files
       - burgermockup-metrics:/data/metrics

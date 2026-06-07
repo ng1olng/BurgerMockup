@@ -99,6 +99,10 @@ class VariantRef(BaseModel):
     scene_id: str
     placement: str = ""
     design_scale: Optional[float] = None
+    # Echoed from ai-rendered (on-model) results; a refine of such a variant
+    # rebuilds the on-model prompt from these instead of recompositing.
+    setting: Optional[str] = None
+    model_persona: Optional[str] = None
 
 
 class VariantResult(BaseModel):
@@ -121,11 +125,26 @@ class VariantResult(BaseModel):
     # back on refine so the variant reproduces its own quad.
     placement: str = ""
     design_scale: float = 1.0
+    # "exact": design composited by CV, pixel-true (flat/lifestyle paths).
+    # "ai-rendered": design passed through the image model once (on-model
+    # path) — near-exact, not print-exact; consumers must disclose this.
+    design_fidelity: str = "exact"
+    # On-model variants echo the prompt inputs (stateless server: a refine
+    # must rebuild the on-model prompt from what the host passes back).
+    # None on exact variants.
+    setting: Optional[str] = None
+    model_persona: Optional[str] = None
 
 
 class RefineDelta(BaseModel):
     type: str  # design | scene | product
     change: str = ""
+    # Scene-delta overrides (additive). They set/replace WHERE (setting) and
+    # WHO (model_persona) directly on the delta, so persona/setting changes do
+    # not depend on the host echoing the variant's fields back intact — weak
+    # host models drop echoed fields, which silently produced a flat render.
+    setting: str = ""
+    model_persona: str = ""
     target_ordinal: Optional[int] = None  # 1-based; None = all variants
 
 
