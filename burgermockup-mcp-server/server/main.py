@@ -40,9 +40,76 @@ from server.storage import file_store
 from server.tools.catalog_tools import match_product
 from server.tools.design_tools import register_design
 from server.tools.export_tools import export_listing
+from server.tools.image_gen_compat import handle_image_generations
 from server.tools.mockup_tools import generate_mockups, refine_mockups
 
-mcp = FastMCP("burgermockup")
+mcp = FastMCP(
+    "burgermockup",
+    instructions=(
+        "BurgerMockup — AI mockup generator for print-on-demand products.\n\n"
+        "## Required call order\n\n"
+        "1. **match_product(query)** — resolve a natural-language product name (VN or EN) to a "
+        "`product_id`. Always run this first; never guess a product_id.\n\n"
+        "2. **register_design(image_base64, filename)** — upload the seller's design image and "
+        "receive a `design_id`. Skip this step only if the message already contains a "
+        "`design registered: design_id=...` annotation (injected automatically by the "
+        "BurgerMockup design-bridge filter when the user attaches an image).\n\n"
+        "3. **generate_mockups(job_id, design_id, product_id, scene_specs, n)** — generate up "
+        "to 8 variants. Requires both `design_id` (step 2) and `product_id` (step 1). "
+        "Use a fresh UUID for `job_id`. Each ready variant in the result contains a `url` — "
+        "render it inline: ![variant](url).\n\n"
+        "4. **refine_mockups(...)** — optional follow-up to adjust design scale, regenerate "
+        "scenes, or swap the product. Pass the `variants` list returned by step 3.\n\n"
+        "5. **export_listing(variant_ids)** — not yet available; returns not_implemented.\n\n"
+        "## Example — 'Tạo tshirt với design này, áo màu trắng'\n\n"
+        "User attaches an image and asks to create a white t-shirt mockup.\n\n"
+        "```\n"
+        "# Step 1 — design_id already injected by the filter (image was attached):\n"
+        "# [design registered: design_id=abc123 ...] ← read from message, skip register_design\n\n"
+        "# Step 2 — resolve product\n"
+        "match_product(query='tshirt trắng')\n"
+        "# → product_id='unisex-tshirt-01'\n\n"
+        "# Step 3 — generate mockup with white color hint in scene_specs\n"
+        "generate_mockups(\n"
+        "    job_id='<uuid>',\n"
+        "    design_id='abc123',\n"
+        "    product_id='unisex-tshirt-01',\n"
+        "    scene_specs=[{'setting': 'studio white background', 'lighting': 'soft'}],\n"
+        "    n=2\n"
+        ")\n"
+        "# → display each variant url as ![variant](url)\n"
+        "```\n\n"
+        "## scene_specs — generating diverse variants\n\n"
+        "Each element in `scene_specs` is a `SceneSpec` object with these optional fields:\n"
+        "`niche`, `setting`, `model_persona`, `lighting`, `mood`, `market`,\n"
+        "`camera`, `composition`, `style`, `film_look`.\n\n"
+        "Built-in niches (use as `niche` value): cafe, streetwear, yoga, cozy, picnic, "
+        "flat-lay, christmas, christmas-outdoor, christmas-gifting.\n\n"
+        "**For a 3-scene Christmas batch** (e.g. user says '3 scene mùa lễ'), pass three "
+        "distinct specs — one per sub-variant — to get meaningfully different backgrounds:\n\n"
+        "```\n"
+        "scene_specs=[\n"
+        "  {'niche': 'christmas'},\n"
+        "  {'niche': 'christmas-outdoor'},\n"
+        "  {'niche': 'christmas-gifting'},\n"
+        "]\n"
+        "```\n\n"
+        "You may also add `camera`, `composition`, `style`, or `film_look` to any spec "
+        "for cinematic quality when the user asks for editorial/premium output:\n\n"
+        "```\n"
+        "{'niche': 'christmas', 'style': 'editorial lifestyle',\n"
+        " 'camera': 'Canon EOS R5, 85mm, f/1.8', 'film_look': 'warm film grain'}\n"
+        "```\n\n"
+        "## Rules\n"
+        "- Never call generate_mockups without a registered design_id.\n"
+        "- Never fabricate product_id; always call match_product first.\n"
+        "- When user mentions a color (trắng/đen/xanh/...), pass it as `setting` or `mood` in "
+        "scene_specs — do NOT pass it as a separate tool argument.\n"
+        "- Never pass caller-supplied strings as negative_constraints; these are injected "
+        "server-side automatically.\n"
+        "- Display every variant url as a markdown image immediately after generation."
+    ),
+)
 # Logs every MCP request/tool call with args. Payloads here are IDs and scene
 # specs only — never secrets or image bytes — so they are safe on the console.
 mcp.add_middleware(LoggingMiddleware(include_payloads=True))
@@ -52,6 +119,18 @@ mcp.tool(match_product)
 mcp.tool(generate_mockups)
 mcp.tool(refine_mockups)
 mcp.tool(export_listing)
+
+
+@mcp.custom_route("/v1/images/generations", methods=["POST"])
+async def openai_image_generations(request: Request) -> JSONResponse:
+    """OpenAI-compatible image generation endpoint for OWUI / any OpenAI client.
+
+    Configure OWUI: IMAGE_GENERATION_ENGINE=openai,
+    IMAGES_OPENAI_API_BASE_URL=http://127.0.0.1:8100/v1
+    """
+    body = await request.json()
+    result, status_code = await handle_image_generations(body)
+    return JSONResponse(result, status_code=status_code)
 
 
 @mcp.custom_route("/designs", methods=["POST"])

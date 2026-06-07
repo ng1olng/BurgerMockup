@@ -33,6 +33,18 @@
 4. **register_design** — Persist design metadata (hash, print-area) for catalog indexing
 5. **export_listing** — Stub for marketplace publish (TBD)
 
+**OpenAI-Compatible Image Endpoint** (`POST /v1/images/generations`):
+- Path A integration: accepts `{prompt, n, response_format}`, returns `{created, data: [{url}]}`
+- Pure Gemini pass-through — no compositor or SSIM gate
+- Lets OWUI use the MCP server as its image generation backend (`IMAGE_GENERATION_ENGINE=openai`)
+- Works with OWUI's built-in `IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE` for automatic prompt enrichment
+
+**Scene Specs** (`server/pipeline/prompts.py`):
+- Built-in niches: `cafe`, `streetwear`, `yoga`, `cozy`, `picnic`, `flat-lay`, `christmas`, `christmas-outdoor`, `christmas-gifting`
+- VN aliases: `giáng sinh`/`noel`/`mùa lễ` → `christmas`
+- `SceneSpec` fields: `niche`, `setting`, `model_persona`, `lighting`, `mood`, `market`, `camera`, `composition`, `style`, `film_look`
+- All fields optional; preset defaults per niche; caller values take precedence
+
 **Pipeline** (`server/cv/`):
 - Scene caching per design (byte-deterministic; reused across refines)
 - ECC-based quad detection + homography warping
@@ -40,8 +52,8 @@
 - Per-variant error isolation + fast-fail
 
 **OpenWebUI Integration**:
-- Native MCP via streamable HTTP: `http://host.docker.internal:8100/mcp` from Docker
-- Tool IDs: `server:mcp:burgermockup`
+- **MCP tools**: streamable HTTP at `http://host.docker.internal:8100/mcp` from Docker
+- **Image gen**: OpenAI-compat at `http://host.docker.internal:8100/v1` (set `IMAGE_GENERATION_ENGINE=openai`)
 - No progress UI surfacing (MCP notifications ignored by OpenWebUI v0.9.6; final result only)
 - Ready variants carry `url` field in final tool result; LLM renders as `![variant](url)` markdown in chat (bare-metal local; browser must reach `PUBLIC_FILES_BASE` + `/files/{id}.png`)
 

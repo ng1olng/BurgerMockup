@@ -85,9 +85,10 @@ class Filter:
     class Valves(BaseModel):
         priority: int = Field(default=0, description="Filter execution order")
         mcp_base_url: str = Field(
-            default="http://burgermockup-mcp:8100",
+            default="http://127.0.0.1:8100",
             description="BurgerMockup MCP server base URL reachable from the "
-            "Open WebUI backend (bare-metal server: http://host.docker.internal:8100)",
+            "Open WebUI backend (bare-metal: http://127.0.0.1:8100 | "
+            "Docker compose: http://host.docker.internal:8100)",
         )
 
     def __init__(self):
